@@ -1,26 +1,68 @@
-# Search allowlist. Federal domains apply to every school; school domains apply
-# only to the selected school. Domains marked UNVERIFIED must be checked with a
-# live Exa search before the demo.
+# Source policy for the claim checker.
+#
+# The checker does NOT run an open web search. It reads only the curated official
+# pages listed under `seeds`, and every cited URL must be one of them. `federal`
+# and each school's `domains` are the allowlist; a seed on any other host is a
+# config error (a test enforces this).
+#
+# URLs were checked on 2026-11-14. Official sites reorganize pages, so re-check
+# them before the demo (see tests/test_pipeline.py::test_seed_hosts_are_allowlisted
+# for the offline check, and run a live check separately).
+
 federal:
   - uscis.gov
-  - studyinthestates.dhs.gov
+  - dhs.gov            # includes studyinthestates.dhs.gov
   - ice.gov
   - ecfr.gov
   - irs.gov
   - ssa.gov
-  # Added for rule-change rumors ("Proposed only"). Court status ("Blocked") has no
-  # allowlisted source yet, so the model may only use it if a listed page says so.
   - federalregister.gov
   - regulations.gov
+
+# Keywords (lowercase) that route a claim to topics. A claim matching no topic
+# uses every topic. Matching is on whole words (a trailing plural s is allowed).
+topics:
+  work: [work, working, worked, job, opt, stem, cpt, employment, employer, employed, employ, intern, internship, hour, e-verify, unemployed, unemployment, ead, i-983, cap-gap, cap gap, h-1b, h1b, assistantship, fee, cancel, cancelled, canceled, cancellation, rule, visa]
+  ssn: [ssn, social security, ssa]
+  tax: [tax, irs, '8843', '1040', w-2, w2, w-4, w4, refund, fica, treaty]
+
+seeds:
+  federal:
+    work:
+      - https://studyinthestates.dhs.gov/students/work/working-in-the-united-states
+      - https://studyinthestates.dhs.gov/sevis-help-hub/student-records/fm-student-employment/f-1-optional-practical-training-opt
+      - https://www.uscis.gov/working-in-the-united-states/students-and-exchange-visitors/optional-practical-training-opt-for-f-1-students
+      - https://www.uscis.gov/working-in-the-united-states/students-and-exchange-visitors/optional-practical-training-extension-for-stem-students-stem-opt
+      - https://www.ice.gov/sevis/practical-training
+    ssn:
+      - https://www.ssa.gov/pubs/EN-05-10181.pdf
+    tax:
+      - https://www.irs.gov/individuals/international-taxpayers/taxation-of-nonresident-aliens
+      - https://www.irs.gov/forms-pubs/about-form-8843
+      - https://www.irs.gov/individuals/international-taxpayers/foreign-student-liability-for-social-security-and-medicare-taxes
 
 schools:
   msu:
     name: Michigan State University
-    office: MSU Office for International Students and Scholars
+    office: MSU Office for International Students and Scholars (OISS)
+    office_url: https://oiss.isp.msu.edu
     domains:
-      - msu.edu
+      - oiss.isp.msu.edu
+      - isp.msu.edu
+    seeds:
+      work:
+        - https://oiss.isp.msu.edu/students/current-students/employment
+        - https://oiss.isp.msu.edu/news-events/immigration-updates
+      tax:
+        - https://oiss.isp.msu.edu/resources/taxes
   uchicago:
     name: University of Chicago
     office: UChicago Office of International Affairs
+    office_url: https://internationalaffairs.uchicago.edu
     domains:
-      - uchicago.edu   # UNVERIFIED: confirm which subdomains hold ISSS/OIA pages
+      - internationalaffairs.uchicago.edu
+    seeds:
+      work:
+        - https://internationalaffairs.uchicago.edu/students/current-students/optional-practical-training
+        - https://internationalaffairs.uchicago.edu/students/current-students/stem-opt-extension
+        - https://internationalaffairs.uchicago.edu/students/current-students/on-campus-employment

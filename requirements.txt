@@ -1,6 +1,7 @@
 streamlit
-exa-py
-openai
+google-genai
+requests
+pypdf
 pydantic
 pyyaml
 python-dotenv

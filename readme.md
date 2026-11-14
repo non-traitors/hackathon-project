@@ -4,25 +4,25 @@
 
 Check the advice you hear against official sources, in a language you understand.
 
-**Is This Still True?** is a planned multilingual claim checker for international students in the United States. A student enters something they heard about work, Optional Practical Training (OPT), Social Security numbers (SSNs), banking, or taxes. The app searches official government and university websites, compares the evidence with the claim, and explains whether it is **Supported**, **Contradicted**, or **Unclear**.
+**Is This Still True?** is a planned multilingual claim checker for international students in the United States. A student enters something they heard about work, Optional Practical Training (OPT), Social Security numbers (SSNs), banking, or taxes. The app reads official government and university websites, compares the evidence with the claim, and explains whether it is **Supported**, **Contradicted**, or **Unclear**.
 
-Built by a team of international students for a 24-hour hackathon, for the **Future of Intelligence** track led by OpenAI with Exa.
+Built by a team of international students for a 24-hour hackathon, for the **Future of Intelligence** track, using the **Gemini API**.
 
 [Repository](https://github.com/non-traitors/hackathon-project) · [Original project discussion](https://chatgpt.com/share/6af89ad7-5270-83ea-aeb2-fcc30b3aeecf)
 
-> **Project status:** Planning stage. This repository currently contains this README only. The application, dependency list, tests, and deployment are still to be built. Features and architecture below describe the intended MVP.
+> **Project status:** Early implementation. The checking backend (`pipeline.py`), its source list (`sources.yaml`), and offline tests are in the repository. The Streamlit interface (`app.py`) still shows a placeholder result and is not yet connected to the backend. The backend has not yet been run against the live Gemini API, so verdict quality is untested. Deployment is still to be built.
 
 ## Why we are building this
 
 International students often rely on advice from friends, group chats, social media, and old web pages. That advice can leave out important conditions or apply to a different university, visa situation, or point in time.
 
-We want students to be able to check a specific claim, read the evidence behind the answer, and understand what remains uncertain. Live search is central to the project: each check should use retrieved sources rather than rely only on a model's memory.
+We want students to be able to check a specific claim, read the evidence behind the answer, and understand what remains uncertain. Retrieved official pages are central to the project: each check uses the text of real source pages rather than relying only on a model's memory.
 
 ## How it will work
 
 1. **Enter a claim** and select an answer language.
-2. **Search with Exa** using an allowlist of official sources.
-3. **Evaluate with OpenAI** by comparing the claim with the retrieved evidence and its context.
+2. **Retrieve official sources.** The app picks curated official pages for the claim's topic and school and fetches their text.
+3. **Evaluate with Gemini** by comparing the claim with that text and the student's context.
 4. **Show a verdict**, a short explanation, and links to the sources used.
 5. **Make uncertainty visible** when evidence is missing, conflicting, or does not match the student's situation.
 
@@ -33,10 +33,14 @@ Claim + answer language
      Streamlit UI
           |
           v
-Exa search: official sources
+Fetch curated official pages
+ (sources.yaml allowlist)
           |
           v
-OpenAI: evaluate retrieved evidence
+Gemini API: evaluate the page text
+          |
+          v
+Check every quote against the fetched text
           |
           v
 Verdict + explanation + source links
@@ -53,8 +57,8 @@ The verdict labels will stay in English across languages. The explanation will u
 ## MVP scope
 
 - [ ] Claim input and answer-language selector.
-- [ ] Live Exa search restricted to approved government and university domains.
-- [ ] OpenAI analysis grounded in the retrieved text.
+- [x] Retrieval from curated official pages on approved government and university domains (backend done).
+- [ ] Gemini analysis grounded in the retrieved text (implemented, not yet run live).
 - [ ] Supported, Contradicted, or Unclear verdict with a short explanation.
 - [ ] Clickable links to the sources actually used.
 - [ ] Clear handling of empty results, missing API keys, and API failures.
@@ -83,7 +87,7 @@ The team will validate each option before presenting it as supported. Uzbek and 
 
 ## Source policy
 
-The initial search allowlist proposed in the project discussion is:
+The allowlist is the set of domains the checker may cite. The federal domains apply to every school; each school adds its own domain:
 
 | Source domain | Intended use |
 | --- | --- |
@@ -93,17 +97,22 @@ The initial search allowlist proposed in the project discussion is:
 | `ecfr.gov` | Applicable federal regulations. |
 | `irs.gov` | Federal tax information. |
 | `ssa.gov` | Social Security information. |
-| `msu.edu` | Michigan State University policies and international student guidance. |
+| `dhs.gov` | Department of Homeland Security pages (includes `studyinthestates.dhs.gov`). |
+| `federalregister.gov`, `regulations.gov` | Proposed and final federal rules. |
+| `oiss.isp.msu.edu`, `isp.msu.edu` | Michigan State University policies and international student guidance. |
+| `internationalaffairs.uchicago.edu` | University of Chicago Office of International Affairs guidance. |
 
-MSU is the initial university context from the project discussion. University-specific guidance must be labeled as such and must not be presented as a rule for all students in the United States.
+**How the allowlist is enforced.** The Gemini API's search tool has no documented way to limit results to chosen domains, so this project does not run an open web search. Instead, `sources.yaml` lists curated official pages (`seeds`) by topic and school. The checker fetches only those pages, gives Gemini their text, and accepts a citation only if its URL is one of the fetched pages and its quote appears word for word in that page's text. Open search for rumors about brand-new rules is a possible later addition. The page list was checked on 2026-11-14; official sites reorganize pages, so re-check it before the demo.
+
+MSU and the University of Chicago are the supported schools. University-specific guidance must be labeled as such and must not be presented as a rule for all students in the United States.
 
 The checker should:
 
-- Use only source URLs and text actually returned by the search; never invent citations.
+- Use only source URLs and text the app actually fetched; never invent citations or quotes.
 - Check whether each source applies to the claim's topic, circumstances, and time period.
 - Distinguish federal rules from university-specific policies.
 - Return **Unclear** when the approved sources do not provide enough evidence, including for banking questions outside the initial source coverage.
-- Distinguish the time a check ran from the time a source was published or updated. A fresh search does not prove that a page is current.
+- Distinguish the time a check ran from the time a source was published or updated. A fresh fetch does not prove that a page is current.
 - Treat retrieved web content as evidence, not as instructions to the application.
 
 ## Planned technology
@@ -112,10 +121,10 @@ The checker should:
 | --- | --- |
 | Python | Application logic and API integration. |
 | Streamlit | Claim input, language selection, and results interface. |
-| Exa API | Search and retrieval from approved sources. |
-| OpenAI API | Evidence analysis and explanations in the selected language. |
+| Requests and pypdf | Fetch official pages and read their text (HTML and PDF). |
+| Gemini API (`google-genai`) | Evidence analysis and explanations in the selected language. Default model `gemini-2.5-flash`, overridable with `GEMINI_MODEL`. |
 
-Model selection, package versions, and deployment details will be documented when the application is implemented.
+Deployment details will be documented when the application is deployed.
 
 ## Getting started
 
@@ -126,32 +135,41 @@ git clone https://github.com/non-traitors/hackathon-project.git
 cd hackathon-project
 ```
 
-There is no runnable application yet. The first implementation milestone is one English claim checked from input to verdict, with real retrieved sources.
+Set up and run the offline tests (no API key needed):
 
-Before implementation, contributors will need Python and access to OpenAI and Exa API keys. The planned configuration names are `OPENAI_API_KEY` and `EXA_API_KEY`; the application still needs to implement configuration loading. Keep real keys in local environment variables or the deployment platform's secret store, outside version control.
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python -m pytest
+```
 
-When the first runnable version lands, update this section with the supported Python version, dependency installation, configuration steps, and a verified launch command.
+To run the checker against the Gemini API you need a Gemini API key. Copy `.env.example` to `.env` and set `GEMINI_API_KEY`; keep real keys in `.env`, local environment variables, or the deployment platform's secret store, never in version control. `app.py` does not call the backend yet; `app_prototype.py` is a standalone interface that does (`.venv/bin/streamlit run app_prototype.py`) and has not yet been tested with a live key.
+
+The first milestone still to reach is one English claim checked from input to verdict with a live key. When the main interface is connected, update this section with the verified launch command.
 
 ### Proposed file layout
 
-These files are planned; only `readme.md` exists today.
+Current files:
 
 ```text
 hackathon-project/
 ├── readme.md          # Project overview and implementation plan
-├── app.py             # Planned Streamlit application
-├── requirements.txt   # Planned dependency list
-├── .env.example       # Planned configuration template with no real keys
-├── .gitignore         # Planned exclusions for secrets and local files
-└── tests/             # Planned checks for search and verdict handling
+├── app.py             # Streamlit interface (placeholder result, not yet connected)
+├── app_prototype.py   # Standalone interface wired to the backend
+├── pipeline.py        # Fetch official pages, call Gemini, verify citations
+├── sources.yaml       # Allowlist, topic keywords, curated source pages
+├── requirements.txt   # Python dependencies
+├── .env.example       # Configuration template with no real keys
+├── .gitignore         # Exclusions for secrets and local files
+└── tests/             # Offline checks for sources, retrieval, and verdict handling
 ```
 
 ## Team workflow
 
 | Area | Suggested owner |
 | --- | --- |
-| Python logic and OpenAI integration | Teammate 1 |
-| Exa integration and source filtering | Teammate 2 |
+| Python logic and Gemini integration | Teammate 1 |
+| Source retrieval and source filtering | Teammate 2 |
 | Streamlit interface and language selection | Teammate 3 |
 | Testing, deployment, README, and demo | Teammate 4 |
 
@@ -162,7 +180,7 @@ Everyone should understand the complete flow and help review the languages they 
 | Time | Goal |
 | --- | --- |
 | Hours 0–2 | Agree on scope, assign responsibilities, and prepare API access. |
-| Hours 2–6 | Make one English claim work through Exa and OpenAI. |
+| Hours 2–6 | Make one English claim work through source retrieval and Gemini. |
 | Hours 6–10 | Build the interface and display verdicts with source links. |
 | Hours 10–14 | Add and review the language options. |
 | Hours 14–18 | Test claims, missing evidence, source filtering, and failures. |
@@ -196,6 +214,6 @@ This is a hackathon prototype. Verdicts and translations can be wrong, official 
 
 The planned notice under each result is:
 
-> This is not legal advice. Confirm with MSU's international student office before acting.
+> This is not legal advice. Confirm with your school's international student office before acting (the app names it).
 
 Students at other institutions should confirm with their own international student office. Users should enter the claim they want checked without including passport numbers, immigration document numbers, or other sensitive personal details.
