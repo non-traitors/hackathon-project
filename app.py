@@ -30,7 +30,7 @@ def mock_check(claim, language):
 st.title("OPT Reality Check")
 st.caption("Is that OPT rumor true? Checked against official sources.")
 
-language = st.selectbox("Answer in", ["English", "العربية", "中文", "繁體中文", "O'zbekcha"])
+language = st.selectbox("Answer in", ["English", "العربية", "中文", "繁體中文", "Русский"])
 
 if language == "العربية":
     st.markdown("<style>.block-container{direction:rtl;text-align:right}</style>",
