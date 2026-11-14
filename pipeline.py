@@ -1,4 +1,4 @@
-"""Claim-checking pipeline: curated official pages -> Gemini analysis.
+"""Claim-checking pipeline: curated official pages -> Gemini analysis (Interactions API).
 
 The checker does not run an open web search. For each claim it picks a small set
 of curated official pages (sources.yaml), fetches their text itself, and gives
@@ -31,7 +31,7 @@ PAGE_CHARS = 25_000  # text kept per page (the model sees, and we verify against
 MAX_PAGE_BYTES = 15_000_000
 FETCH_TIMEOUT = 20
 CACHE_TTL = 3600  # seconds; official pages change slowly
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL = "gemini-4-hydrogen"
 USER_AGENT = "Mozilla/5.0 (compatible; StudentClaimChecker/0.1)"
 
 Verdict = Literal["Supported", "Contradicted", "Unclear"]
@@ -273,22 +273,22 @@ def analyze(claim: str, context: dict, school_key: str, docs: list[dict], langua
     config = config or load_config()
     key = _api_key()
     from google import genai
-    from google.genai import types
 
     school_name = config["schools"][school_key]["name"]
     try:
-        client = genai.Client(api_key=key, http_options=types.HttpOptions(timeout=90_000))
-        resp = client.models.generate_content(
+        client = genai.Client(api_key=key)
+        interaction = client.interactions.create(
             model=os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL,
-            contents=_build_user_prompt(claim, context, school_name, docs, language),
-            config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_PROMPT,
-                response_mime_type="application/json",
-                response_schema=_LLMOutput,
-                temperature=0,
-            ),
+            input=_build_user_prompt(claim, context, school_name, docs, language),
+            system_instruction=SYSTEM_PROMPT,
+            generation_config={"temperature": 0},
+            response_format={
+                "type": "text",
+                "mime_type": "application/json",
+                "schema": _LLMOutput.model_json_schema(),
+            },
         )
-        text = resp.text
+        text = interaction.output_text
     except Exception as e:  # network, auth, quota
         raise CheckError("We couldn't analyze the sources right now. Please try again.") from e
     if not text:  # e.g. the response was blocked

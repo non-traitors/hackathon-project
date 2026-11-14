@@ -10,7 +10,7 @@ Built by a team of international students for a 24-hour hackathon, for the **Fut
 
 [Repository](https://github.com/non-traitors/hackathon-project) · [Original project discussion](https://chatgpt.com/share/6af89ad7-5270-83ea-aeb2-fcc30b3aeecf)
 
-> **Project status:** Early implementation. The checking backend (`pipeline.py`), its source list (`sources.yaml`), and offline tests are in the repository. The Streamlit interface (`app.py`) still shows a placeholder result and is not yet connected to the backend. The backend has not yet been run against the live Gemini API, so verdict quality is untested. Deployment is still to be built.
+> **Project status:** Early implementation. The checking backend (`pipeline.py`), its source list (`sources.yaml`), and offline tests are in the repository. The Streamlit interface (`app.py`) still shows a placeholder result and is not yet connected to the backend. The backend has been run live against the Gemini API on six test claims (see Demo and validation plan for what that showed); a check currently takes about 12–32 seconds, and the Cantonese and Uzbek output has not been reviewed. Deployment is still to be built.
 
 ## Why we are building this
 
@@ -58,7 +58,7 @@ The verdict labels will stay in English across languages. The explanation will u
 
 - [ ] Claim input and answer-language selector.
 - [x] Retrieval from curated official pages on approved government and university domains (backend done).
-- [ ] Gemini analysis grounded in the retrieved text (implemented, not yet run live).
+- [x] Gemini analysis grounded in the retrieved text (implemented and run live on six claims).
 - [ ] Supported, Contradicted, or Unclear verdict with a short explanation.
 - [ ] Clickable links to the sources actually used.
 - [ ] Clear handling of empty results, missing API keys, and API failures.
@@ -122,7 +122,7 @@ The checker should:
 | Python | Application logic and API integration. |
 | Streamlit | Claim input, language selection, and results interface. |
 | Requests and pypdf | Fetch official pages and read their text (HTML and PDF). |
-| Gemini API (`google-genai`) | Evidence analysis and explanations in the selected language. Default model `gemini-2.5-flash`, overridable with `GEMINI_MODEL`. |
+| Gemini API (`google-genai`, Interactions API) | Evidence analysis and explanations in the selected language. Default model `gemini-4-hydrogen`, overridable with `GEMINI_MODEL`. Needs Python 3.10 or newer. |
 
 Deployment details will be documented when the application is deployed.
 
@@ -135,17 +135,17 @@ git clone https://github.com/non-traitors/hackathon-project.git
 cd hackathon-project
 ```
 
-Set up and run the offline tests (no API key needed):
+Set up and run the offline tests (no API key needed). Use Python 3.10 or newer; on Python 3.9 pip installs an older `google-genai` without the Interactions API.
 
 ```bash
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest
+python3.13 -m venv .venv313   # any Python 3.10+
+.venv313/bin/pip install -r requirements.txt
+.venv313/bin/python -m pytest
 ```
 
-To run the checker against the Gemini API you need a Gemini API key. Copy `.env.example` to `.env` and set `GEMINI_API_KEY`; keep real keys in `.env`, local environment variables, or the deployment platform's secret store, never in version control. `app.py` does not call the backend yet; `app_prototype.py` is a standalone interface that does (`.venv/bin/streamlit run app_prototype.py`) and has not yet been tested with a live key.
+To run the checker against the Gemini API you need a Gemini API key. Copy `.env.example` to `.env` and set `GEMINI_API_KEY`; keep real keys in `.env`, local environment variables, or the deployment platform's secret store, never in version control. `app.py` does not call the backend yet; `app_prototype.py` is a standalone interface that does (`.venv313/bin/streamlit run app_prototype.py`); the pipeline it calls has been tested live, but that interface has not been clicked through with a live key.
 
-The first milestone still to reach is one English claim checked from input to verdict with a live key. When the main interface is connected, update this section with the verified launch command.
+The backend milestone is reached: English and Arabic claims were checked end to end with a live key. The next milestone is connecting the main interface (`app.py`); when that is done, update this section with the verified launch command.
 
 ### Proposed file layout
 
