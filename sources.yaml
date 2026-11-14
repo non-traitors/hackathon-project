@@ -1,0 +1,26 @@
+# Search allowlist. Federal domains apply to every school; school domains apply
+# only to the selected school. Domains marked UNVERIFIED must be checked with a
+# live Exa search before the demo.
+federal:
+  - uscis.gov
+  - studyinthestates.dhs.gov
+  - ice.gov
+  - ecfr.gov
+  - irs.gov
+  - ssa.gov
+  # Added for rule-change rumors ("Proposed only"). Court status ("Blocked") has no
+  # allowlisted source yet, so the model may only use it if a listed page says so.
+  - federalregister.gov
+  - regulations.gov
+
+schools:
+  msu:
+    name: Michigan State University
+    office: MSU Office for International Students and Scholars
+    domains:
+      - msu.edu
+  uchicago:
+    name: University of Chicago
+    office: UChicago Office of International Affairs
+    domains:
+      - uchicago.edu   # UNVERIFIED: confirm which subdomains hold ISSS/OIA pages
