@@ -29,6 +29,7 @@ def _out(verdict, sources):
         sources=sources,
         clarifying_question=None,
         next_step="",
+        question_for_office="",
     )
 
 
@@ -176,3 +177,108 @@ def test_topic_keywords_match_whole_words_only():
     # "intern" must not match "international": only tax pages (plus MSU's tax page)
     assert all("irs.gov" in u or "oiss.isp.msu.edu/resources/taxes" in u for u in urls)
     assert any("irs.gov" in u for u in urls)
+
+
+# --- finer routing, fee/rule sources, passage selection, English office question ---
+def test_fee_claim_gets_fee_pages_not_the_whole_work_list():
+    cfg = pipeline.load_config()
+    urls = pipeline.select_seeds("OPT now costs $70,000", "uchicago", cfg)
+    assert any(u.endswith("/g-1055") or u.endswith("/i-765") for u in urls)
+    assert len(urls) <= pipeline.MAX_DOCS
+
+
+def test_rule_change_claim_gets_final_rule_pages():
+    cfg = pipeline.load_config()
+    urls = pipeline.select_seeds("STEM OPT is ending", "msu", cfg)
+    assert any("final-rule" in u for u in urls)
+    assert any("immigration-updates" in u for u in urls)
+    assert any("stem-students-stem-opt" in u for u in urls)
+
+
+def test_on_campus_claim_stays_small():
+    cfg = pipeline.load_config()
+    urls = pipeline.select_seeds("F-1 students can work 30 hours per week on campus", "msu", cfg)
+    assert len(urls) <= 6, urls
+
+
+def test_page_cap_still_covers_every_topic_for_unmatched_claims():
+    cfg = pipeline.load_config()
+    urls = pipeline.select_seeds("something totally unrelated", "uchicago", cfg)
+    assert len(urls) == pipeline.MAX_DOCS
+    assert any("ssa.gov" in u for u in urls) and any("irs.gov" in u for u in urls)
+    assert any("g-1055" in u for u in urls) and any("final-rule" in u for u in urls)
+
+
+LONG_PAGE = " ".join(
+    ["Filler sentence about campus parking and library hours."] * 400
+    + ["F-1 students may not work more than 20 hours per week when school is in session."]
+    + ["More filler about dining halls and shuttle buses."] * 400
+)
+
+
+def test_passage_selection_keeps_the_answer_bearing_passage():
+    view = pipeline.select_passages(LONG_PAGE, "F-1 students can work 30 hours per week on campus", 3000)
+    assert "20 hours per week when school is in session" in view
+    assert len(view) < len(LONG_PAGE) / 4
+
+
+def test_short_pages_are_sent_whole():
+    assert pipeline.select_passages("Short page.", "anything", 3000) == "Short page."
+
+
+def test_unmatched_claim_falls_back_to_start_of_page_with_bigger_allowance():
+    view = pipeline.select_passages(LONG_PAGE, "claim with no english overlap xyz", 3000)
+    assert view.startswith("Filler sentence") and 3000 < len(view) <= 3000 * 2 + 1500
+
+
+def test_quote_verified_against_full_text_not_the_trimmed_view():
+    doc = dict(DOCS[0], text=LONG_PAGE, view="only a trimmed view")
+    q = "not work more than 20 hours per week when school is in session"
+    out = _out("Contradicted", [_LLMSource(url=doc["url"], quote=q)])
+    sources, verdict = validate_output(out, [doc])
+    assert len(sources) == 1 and verdict == "Contradicted"
+
+
+def test_prompt_uses_trimmed_view_when_present():
+    doc = dict(DOCS[0], text="FULL TEXT " * 100, view="TRIMMED", scope="federal")
+    prompt = pipeline._build_user_prompt("c", {}, "School", [doc], "English")
+    assert "TRIMMED" in prompt and "FULL TEXT" not in prompt
+
+
+def test_question_for_office_is_passed_through_in_english(monkeypatch):
+    out = _out("Unclear", [])
+    out.question_for_office = "Does the new rule affect my STEM OPT extension?"
+    out.next_step = "تواصل مع مكتب الطلاب الدوليين"
+    monkeypatch.setattr(pipeline, "retrieve", lambda *a, **k: DOCS)
+    monkeypatch.setattr(pipeline, "analyze", lambda *a, **k: out)
+    r = check_claim("claim", "msu", {}, "Arabic")
+    assert r.question_for_office.startswith("Does the new rule") and r.next_step.startswith("تواصل")
+
+
+def test_fee_questions_keep_passages_with_dollar_amounts():
+    page = " ".join(["Filler about forms and mailing addresses."] * 300
+                    + ["The filing fee for Form I-765 is $520 when filed on paper."]
+                    + ["More filler about biometrics appointments."] * 300)
+    view = pipeline.select_passages(page, "OPT now costs $70,000", 3000, extra={"fee", "filing"}, money=True)
+    assert "$520" in view
+
+
+def test_gemini_client_has_a_request_timeout():
+    assert pipeline.REQUEST_TIMEOUT_MS > 0
+
+
+def test_api_errors_get_actionable_messages():
+    class E(Exception):
+        def __init__(self, code, msg=""):
+            super().__init__(msg)
+            self.status_code = code
+
+    assert "usage limit" in pipeline._friendly_api_error(E(402, "credits are depleted"))
+    assert "usage limit" in pipeline._friendly_api_error(E(429))
+    assert "not set up correctly" in pipeline._friendly_api_error(E(401))
+    assert "try again" in pipeline._friendly_api_error(E(500))
+    assert "try again" in pipeline._friendly_api_error(ConnectionResetError("reset"))
+
+
+def test_default_thinking_is_a_valid_level():
+    assert pipeline.DEFAULT_THINKING in ("", "minimal", "low", "medium", "high", "xhigh")

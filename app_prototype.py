@@ -9,6 +9,12 @@ import pipeline
 
 load_dotenv()
 
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def cached_check(claim, school_key, context_items, language):
+    """Repeat checks of the same claim are instant; errors are not cached."""
+    return pipeline.check_claim(claim, school_key, dict(context_items), language)
+
 LANGUAGES = {
     "English": "English",
     "العربية (Arabic)": "Arabic",
@@ -93,8 +99,8 @@ if st.button("Check this claim", type="primary"):
         "assistantship": "yes" if assistantship else "",
     }
     try:
-        with st.status("Searching official government and university sources…", expanded=False) as status:
-            result = pipeline.check_claim(claim, school_key, context, language)
+        with st.status("Reading official government and university sources… (about 10 seconds)", expanded=False) as status:
+            result = cached_check(claim, school_key, tuple(sorted(context.items())), language)
             status.update(label="Done", state="complete")
     except pipeline.CheckError as e:
         st.error(str(e))
@@ -120,6 +126,9 @@ if st.button("Check this claim", type="primary"):
         st.info(f"To give a firmer answer: {result.clarifying_question}")
     if result.next_step:
         st.warning(f"**Next step:** {result.next_step}")
+    if result.question_for_office:
+        st.markdown("**Question to send your school's office (in English):**")
+        st.code(result.question_for_office, language=None)
 
     if result.sources:
         st.subheader("Sources used")

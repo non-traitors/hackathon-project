@@ -6,8 +6,8 @@
 # config error (a test enforces this).
 #
 # URLs were checked on 2026-11-14. Official sites reorganize pages, so re-check
-# them before the demo (see tests/test_pipeline.py::test_seed_hosts_are_allowlisted
-# for the offline check, and run a live check separately).
+# them before the demo (tests/test_pipeline.py::test_seed_hosts_are_allowlisted
+# is the offline check; tests/live_golden.py exercises the real pages).
 
 federal:
   - uscis.gov
@@ -19,21 +19,36 @@ federal:
   - federalregister.gov
   - regulations.gov
 
-# Keywords (lowercase) that route a claim to topics. A claim matching no topic
-# uses every topic. Matching is on whole words (a trailing plural s is allowed).
+# Keywords (lowercase) that route a claim to topics. Matching is on whole words
+# (a trailing plural s is allowed). A claim matching no topic uses every topic.
+# Narrow topics keep each check to the few pages it needs, which keeps it fast.
 topics:
-  work: [work, working, worked, job, opt, stem, cpt, employment, employer, employed, employ, intern, internship, hour, e-verify, unemployed, unemployment, ead, i-983, cap-gap, cap gap, h-1b, h1b, assistantship, fee, cancel, cancelled, canceled, cancellation, rule, visa]
+  oncampus: [on-campus, campus, hour, work, working, job, employment, employer, employed, assistantship, intern, internship]
+  opt: [opt, optional practical training, cpt, curricular practical training, ead, unemployed, unemployment, e-verify, i-983, cap-gap, cap gap, h-1b, h1b, post-completion, work, working, job, employment, employer, employed, intern, internship]
+  stem_opt: [stem, e-verify, i-983, 24-month, 24 month, extension]
+  fees: [fee, cost, price, pay, paid, charge, charged, expensive, afford]
+  rules: [rule, ending, ends, ended, ban, banned, scrapped, eliminate, eliminated, abolish, cancel, cancelled, canceled, cancellation, new rule, final rule, proposed, change, changed, changing, duration of status]
   ssn: [ssn, social security, ssa]
   tax: [tax, irs, '8843', '1040', w-2, w2, w-4, w4, refund, fica, treaty]
 
 seeds:
   federal:
-    work:
+    oncampus:
       - https://studyinthestates.dhs.gov/students/work/working-in-the-united-states
+    opt:
       - https://studyinthestates.dhs.gov/sevis-help-hub/student-records/fm-student-employment/f-1-optional-practical-training-opt
       - https://www.uscis.gov/working-in-the-united-states/students-and-exchange-visitors/optional-practical-training-opt-for-f-1-students
-      - https://www.uscis.gov/working-in-the-united-states/students-and-exchange-visitors/optional-practical-training-extension-for-stem-students-stem-opt
       - https://www.ice.gov/sevis/practical-training
+    stem_opt:
+      - https://www.uscis.gov/working-in-the-united-states/students-and-exchange-visitors/optional-practical-training-extension-for-stem-students-stem-opt
+    fees:
+      - https://www.uscis.gov/g-1055
+      - https://www.uscis.gov/i-765
+      - https://www.uscis.gov/forms/filing-fees
+    rules:
+      - https://studyinthestates.dhs.gov/final-rule-establishing-a-fixed-time-period-of-admission-and-an-extension-of-stay-procedure-quick
+      - https://studyinthestates.dhs.gov/final-rule-establishing-a-fixed-time-period-of-admission-and-an-extension-of-stay-procedure-faq
+      - https://studyinthestates.dhs.gov/2026/07/dhs-publishes-final-rule-establishing-a-fixed-time-period-of-admission-and-an-extension-of
     ssn:
       - https://www.ssa.gov/pubs/EN-05-10181.pdf
     tax:
@@ -50,8 +65,13 @@ schools:
       - oiss.isp.msu.edu
       - isp.msu.edu
     seeds:
-      work:
+      oncampus:
         - https://oiss.isp.msu.edu/students/current-students/employment
+      opt:
+        - https://oiss.isp.msu.edu/students/current-students/employment
+      stem_opt:
+        - https://oiss.isp.msu.edu/students/current-students/employment
+      rules:
         - https://oiss.isp.msu.edu/news-events/immigration-updates
       tax:
         - https://oiss.isp.msu.edu/resources/taxes
@@ -62,7 +82,9 @@ schools:
     domains:
       - internationalaffairs.uchicago.edu
     seeds:
-      work:
-        - https://internationalaffairs.uchicago.edu/students/current-students/optional-practical-training
-        - https://internationalaffairs.uchicago.edu/students/current-students/stem-opt-extension
+      oncampus:
         - https://internationalaffairs.uchicago.edu/students/current-students/on-campus-employment
+      opt:
+        - https://internationalaffairs.uchicago.edu/students/current-students/optional-practical-training
+      stem_opt:
+        - https://internationalaffairs.uchicago.edu/students/current-students/stem-opt-extension

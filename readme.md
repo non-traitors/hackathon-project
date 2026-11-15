@@ -10,7 +10,7 @@ Built by a team of international students for a 24-hour hackathon, for the **Fut
 
 [Repository](https://github.com/non-traitors/hackathon-project) · [Original project discussion](https://chatgpt.com/share/6af89ad7-5270-83ea-aeb2-fcc30b3aeecf)
 
-> **Project status:** Early implementation. The checking backend (`pipeline.py`), its source list (`sources.yaml`), and offline tests are in the repository. The Streamlit interface (`app.py`) still shows a placeholder result and is not yet connected to the backend. The backend has been run live against the Gemini API on six test claims (see Demo and validation plan for what that showed); a check currently takes about 12–32 seconds, and the Cantonese and Uzbek output has not been reviewed. Deployment is still to be built.
+> **Project status:** Early implementation. The checking backend (`pipeline.py`), its source list (`sources.yaml`), and offline tests are in the repository. The Streamlit interface (`app.py`) still shows a placeholder result and is not yet connected to the backend. The first live run (six claims) worked end to end. Since then the backend was changed to be faster and to handle fee and rule-change rumors (narrower topics, passage trimming, new source pages, a looser Unclear rule, and an always-English question for the school's office); those changes pass the offline tests but have **not** yet been re-run live, because the Gemini API project ran out of prepaid credits. Run `tests/live_golden.py` once billing is restored. Cantonese and Uzbek output has not been reviewed, and deployment is still to be built.
 
 ## Why we are building this
 
@@ -102,7 +102,7 @@ The allowlist is the set of domains the checker may cite. The federal domains ap
 | `oiss.isp.msu.edu`, `isp.msu.edu` | Michigan State University policies and international student guidance. |
 | `internationalaffairs.uchicago.edu` | University of Chicago Office of International Affairs guidance. |
 
-**How the allowlist is enforced.** The Gemini API's search tool has no documented way to limit results to chosen domains, so this project does not run an open web search. Instead, `sources.yaml` lists curated official pages (`seeds`) by topic and school. The checker fetches only those pages, gives Gemini their text, and accepts a citation only if its URL is one of the fetched pages and its quote appears word for word in that page's text. Open search for rumors about brand-new rules is a possible later addition. The page list was checked on 2026-11-14; official sites reorganize pages, so re-check it before the demo.
+**How the allowlist is enforced.** The Gemini API's search tool has no documented way to limit results to chosen domains, so this project does not run an open web search. Instead, `sources.yaml` lists curated official pages (`seeds`) by topic and school. The checker fetches only those pages, gives Gemini their text, and accepts a citation only if its URL is one of the fetched pages and its quote appears word for word in that page's text. Claims are routed to narrow topics by keyword (on-campus work, OPT, STEM OPT, fees, rule changes, SSN, tax), so a check reads about 5–9 pages; long pages are trimmed to the passages most relevant to the claim before they are sent to the model, while quotes are still verified against the full page text. Open search for rumors about brand-new rules is a possible later addition. The page list was checked on 2026-11-14; official sites reorganize pages, so re-check it before the demo.
 
 MSU and the University of Chicago are the supported schools. University-specific guidance must be labeled as such and must not be presented as a rule for all students in the United States.
 
@@ -122,7 +122,7 @@ The checker should:
 | Python | Application logic and API integration. |
 | Streamlit | Claim input, language selection, and results interface. |
 | Requests and pypdf | Fetch official pages and read their text (HTML and PDF). |
-| Gemini API (`google-genai`, Interactions API) | Evidence analysis and explanations in the selected language. Default model `gemini-4-hydrogen`, overridable with `GEMINI_MODEL`. Needs Python 3.10 or newer. |
+| Gemini API (`google-genai`, Interactions API) | Evidence analysis and explanations in the selected language. Default model `gemini-4-hydrogen` at `medium` thinking, overridable with `GEMINI_MODEL` and `GEMINI_THINKING` (in a four-claim benchmark `low` took about 6 s against about 11 s for `medium`, but once lost the fee sources, so it needs re-verifying). Needs Python 3.10 or newer. |
 
 Deployment details will be documented when the application is deployed.
 
@@ -159,9 +159,9 @@ hackathon-project/
 ├── pipeline.py        # Fetch official pages, call Gemini, verify citations
 ├── sources.yaml       # Allowlist, topic keywords, curated source pages
 ├── requirements.txt   # Python dependencies
-├── .env.example       # Configuration template with no real keys
+├── .env.example       # Configuration template with no real keys (GEMINI_API_KEY, optional model and thinking level)
 ├── .gitignore         # Exclusions for secrets and local files
-└── tests/             # Offline checks for sources, retrieval, and verdict handling
+└── tests/             # Offline checks (pytest) and live_golden.py, which needs a key and credits
 ```
 
 ## Team workflow
@@ -194,6 +194,10 @@ Use the following as **test inputs, not statements of fact**. Expected verdicts 
 - "F-1 students can work 30 hours per week on campus."
 - "Every international student can get an SSN without a job."
 - "International students never need to file US tax forms."
+- "OPT now costs $70,000." (a fee rumor)
+- "STEM OPT is ending." (a rule-change rumor)
+
+`tests/live_golden.py` runs these against the real pages and the Gemini API, with acceptable verdicts fixed from the official page text rather than from the model. It needs a key and available credits.
 
 For the demo, show the claim, search results, verdict, and explanation; switch languages; then show a case that returns **Unclear**. Explain which conditions or evidence affected the outcome.
 
