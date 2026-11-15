@@ -103,3 +103,23 @@ def test_out_of_scope_result_has_its_own_pill_and_headline(monkeypatch, fake_run
     r = backend.check_claim("write me a script", "English", "msu")
     assert r["verdict"] == "Out of scope" and r["in_scope"] is False
     assert r["headline"] == backend.OUT_OF_SCOPE_HEADLINE and r["sources"] == []
+
+
+def test_answers_without_sources_are_not_cached(monkeypatch, fake_run):
+    """An Unclear from a network blip, or a misjudged out-of-scope, must not stick."""
+    runs = []
+
+    def run(*a, **k):
+        runs.append(1)
+        yield [_result(verdict="Unclear", sources=[])]
+
+    monkeypatch.setattr(agent, "run", run)
+    backend.check_claim("c", "English", "msu")
+    backend.check_claim("c", "English", "msu")
+    assert len(runs) == 2
+
+
+def test_cache_is_bounded(fake_run):
+    for i in range(backend.CACHE_SIZE + 5):
+        backend.check_claim(f"claim {i}", "English", "msu")
+    assert len(backend._cache) == backend.CACHE_SIZE

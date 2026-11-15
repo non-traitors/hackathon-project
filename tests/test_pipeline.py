@@ -352,3 +352,11 @@ def test_rate_limit_error_is_a_friendly_message(monkeypatch):
     monkeypatch.setattr(genai, "Client", FakeClient)
     with pytest.raises(CheckError, match="usage limit"):
         pipeline._generate("s", "p", {})
+
+
+@pytest.mark.parametrize("quote", ["on", "F-1", ".", "20 hours"])
+def test_trivial_quote_cannot_carry_a_verdict(quote):
+    """A quote of a word or two appears in any page, so it proves nothing."""
+    out = _out("Supported", [_LLMSource(url=DOCS[0]["url"], quote=quote)])
+    sources, verdict = validate_output(out, DOCS)
+    assert sources == [] and verdict == "Unclear"

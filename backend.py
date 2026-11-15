@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import copy
 import re
+import time
 from typing import Iterator
 from urllib.parse import urlparse
 
@@ -34,7 +35,11 @@ HEADLINE_CHARS = 120
 OUT_OF_SCOPE_VERDICT = "Out of scope"
 OUT_OF_SCOPE_HEADLINE = "That's outside what this checker covers."
 
-_cache: dict[tuple[str, str, str], list[dict]] = {}
+CACHE_SIZE = 64
+
+# Only answers backed by verified sources are cached. An Unclear caused by a
+# network blip, a usage limit, or a misjudged out-of-scope must not stick.
+_cache: dict[tuple[str, str, str], tuple[float, list[dict]]] = {}
 
 
 def clear_cache() -> None:
@@ -95,16 +100,21 @@ def _to_dict(r: agent.AgentResult) -> dict:
 def stream(text: str, language: str, school: str) -> Iterator[dict]:
     """Yield {"step": {...}} for each agent step, then {"results": [...]}."""
     key = ((text or "").strip(), language, school)
-    if key in _cache:
-        yield {"results": copy.deepcopy(_cache[key])}
+    hit = _cache.get(key)
+    if hit and time.time() - hit[0] < pipeline.CACHE_TTL:
+        yield {"results": copy.deepcopy(hit[1])}
         return
     school_key = _school_key(school)
     for item in agent.run(key[0], school_key, None, LANGUAGES.get(language, "English")):
         if isinstance(item, agent.Step):
             yield {"step": item.model_dump()}
         else:
-            _cache[key] = [_to_dict(r) for r in item]
-            yield {"results": copy.deepcopy(_cache[key])}
+            results = [_to_dict(r) for r in item]
+            if all(r["sources"] for r in results):
+                if len(_cache) >= CACHE_SIZE:
+                    _cache.pop(next(iter(_cache)))
+                _cache[key] = (time.time(), copy.deepcopy(results))
+            yield {"results": results}
 
 
 def check_all(text: str, language: str, school: str) -> list[dict]:

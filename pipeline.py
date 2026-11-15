@@ -35,6 +35,7 @@ MAX_PAGE_BYTES = 15_000_000
 FETCH_TIMEOUT = 20
 REQUEST_TIMEOUT_MS = 60_000  # a hung Gemini request must fail, not wait for minutes
 CACHE_TTL = 3600  # seconds; official pages change slowly
+MIN_QUOTE_WORDS = 4  # a one- or two-word quote appears on any page and proves nothing
 DEFAULT_MODEL = "gemini-4-hydrogen"
 # Benchmarked on gemini-4-hydrogen (4 claims): default ~12 s, medium ~11 s, low ~6 s. "low" once
 # dropped the fee sources (before the passage-scoring fix), so "medium" is the safe default until
@@ -447,7 +448,7 @@ def validate_output(out: _LLMOutput, docs: list[dict]) -> "tuple[list[Source], V
         d = by_url.get(s.url)
         if not d or s.url in seen:
             continue
-        if not s.quote.strip() or _norm(s.quote) not in _norm(d["text"]):
+        if len(s.quote.split()) < MIN_QUOTE_WORDS or _norm(s.quote) not in _norm(d["text"]):
             continue
         seen.add(s.url)
         sources.append(Source(url=d["url"], title=d["title"], quote=s.quote.strip(), date=d["date"], scope=d["scope"]))

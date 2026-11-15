@@ -91,7 +91,7 @@ The student still gets an answer.
 
 ```python
 class Step(BaseModel):
-    kind: Literal["split", "plan", "read", "judge", "verify", "fallback"]
+    kind: Literal["split", "scope", "plan", "read", "judge", "verify", "fallback"]  # "scope" added with the scope gate
     label: str          # short, student-facing, English
     detail: list[str]   # e.g. page titles read, or quotes verified
 

@@ -32,9 +32,47 @@ def test_extract_links_keeps_only_allowlisted():
     assert links == [{"url": "https://www.uscis.gov/i-765", "text": "Form I-765"}]
 
 
-def test_extract_links_caps_at_40():
+def test_extract_links_caps_per_page():
     html = "".join(f'<a href="/p{i}">p{i}</a>' for i in range(100))
-    assert len(agent.extract_links(html, "https://www.uscis.gov/", ["uscis.gov"])) == 40
+    assert len(agent.extract_links(html, "https://www.uscis.gov/", ["uscis.gov"])) == agent.MAX_LINKS
+
+
+def test_extract_links_skips_site_menus():
+    html = (
+        '<nav><a href="/menu">Menu</a></nav><header><a href="/top">Top</a></header>'
+        '<p>See <a href="/g-1055">the fee schedule</a>.</p><footer><a href="/foot">Foot</a></footer>'
+    )
+    links = agent.extract_links(html, "https://www.uscis.gov/a", ["uscis.gov"])
+    assert links == [{"url": "https://www.uscis.gov/g-1055", "text": "the fee schedule"}]
+
+
+def test_fetch_refuses_a_url_off_this_schools_allowlist_even_when_cached(monkeypatch):
+    """The cache is shared between schools; a page cached for MSU must not be served to UChicago."""
+    url = "https://oiss.isp.msu.edu/students/current-students/employment"
+    agent._cache.clear()
+    agent._cache[url] = (agent.time.time(), {"url": url, "title": "t", "text": "x", "date": None, "links": []})
+    monkeypatch.setattr("requests.get", lambda *a, **k: pytest.fail("must not fetch"))
+    assert agent.fetch(url, agent.allowed_hosts("uchicago", CFG)) is None
+    assert agent.fetch(url, agent.allowed_hosts("msu", CFG))["title"] == "t"
+
+
+def test_failed_fetch_is_not_cached(monkeypatch):
+    class R:
+        status_code, url, content, headers = 200, "https://www.uscis.gov/a", b"x", {}
+        text = "<p>Fees apply.</p>"
+
+    replies = [OSError("down"), R()]
+
+    def get(*a, **k):
+        r = replies.pop(0)
+        if isinstance(r, Exception):
+            raise r
+        return r
+
+    monkeypatch.setattr("requests.get", get)
+    agent._cache.clear()
+    assert agent.fetch("https://www.uscis.gov/a", ["uscis.gov"]) is None
+    assert agent.fetch("https://www.uscis.gov/a", ["uscis.gov"])["text"] == "Fees apply."
 
 
 def test_fetch_rejects_redirect_off_allowlist(monkeypatch):
@@ -157,7 +195,7 @@ def test_read_more_follows_only_offered_links(monkeypatch):
     r = agent.check(CLAIM, "msu")[0]
     assert fetched == [PAGE["url"], EXTRA["url"]]
     assert [s.kind for s in r.trace] == ["plan", "read", "judge", "read", "judge", "verify"]
-    assert "https://www.uscis.gov/i-765 | Form I-765" in calls[1][1]
+    assert "- https://www.uscis.gov/i-765 | topics: fees" in calls[1][1]
 
 
 def test_already_read_page_is_not_refetched_and_answer_is_forced(monkeypatch):
@@ -194,11 +232,58 @@ def test_quote_from_unread_page_drops_to_unclear(monkeypatch):
     assert r.explanation.startswith("We couldn't verify a citation")
 
 
-def test_agent_error_falls_back(monkeypatch):
-    _wire(monkeypatch, [])  # agent._call raises IndexError on first use
+def test_agent_error_after_the_plan_falls_back_and_says_why(monkeypatch):
+    _wire(monkeypatch, [_plan()])  # the Judge call raises IndexError
     _fallback(monkeypatch)
     r = agent.check(CLAIM, "msu")[0]
-    assert r.explanation == "fb" and r.trace[-1].kind == "fallback" and r.claim == CLAIM
+    assert r.explanation == "fb" and r.claim == CLAIM
+    assert r.trace[-1].kind == "fallback" and r.trace[-1].detail == ["IndexError"]
+
+
+def test_failed_plan_call_fails_closed_without_reading_or_falling_back(monkeypatch):
+    """Scope is decided by the plan call. If it fails, scope is unknown, so nothing else may run."""
+    calls, fetched = _wire(monkeypatch, [])  # the Plan call raises
+    _no_fallback(monkeypatch)
+    r = agent.check("Write me a Python script that sorts a list.", "msu")[0]
+    assert fetched == [] and r.verdict == "Unclear" and r.sources == []
+    assert r.explanation == agent.UNAVAILABLE and r.trace[-1].kind == "fallback"
+
+
+def test_plan_reply_without_in_scope_is_rejected():
+    with pytest.raises(Exception):
+        agent._Plan.model_validate({"urls": [], "search_terms": []})
+
+
+def test_fallback_error_on_one_claim_keeps_the_other_results(monkeypatch):
+    msg = "hey\nwe can work 30 hours on campus now\nalso OPT is cancelled"
+    replies = [agent._Split(claims=["F-1 students can work 30 hours", "OPT is cancelled"]), _plan(), _done(), _plan()]
+    _wire(monkeypatch, replies)  # claim 2: the Judge call raises, then the fallback raises too
+
+    def limited(*a, **k):
+        raise pipeline.CheckError("The checking service has reached its usage limit. Please try again later.")
+
+    monkeypatch.setattr(pipeline, "check_claim", limited)
+    results = agent.check(msg, "msu")
+    assert [r.verdict for r in results] == ["Contradicted", "Unclear"]
+    assert "usage limit" in results[1].explanation and results[1].sources == []
+
+
+def test_link_to_another_schools_site_is_never_offered(monkeypatch):
+    """A cached federal page may carry links filtered for a different school."""
+    msu_link = {"url": "https://oiss.isp.msu.edu/students/current-students/employment", "text": "MSU employment"}
+    page = dict(PAGE, links=[msu_link, PAGE["links"][0]])
+    calls, fetched = _wire(monkeypatch, [_plan(), _more(msu_link["url"]), _done()], pages={PAGE["url"]: page})
+    agent.check(CLAIM, "uchicago")
+    assert msu_link["url"] not in calls[1][1] and fetched == [PAGE["url"]]
+
+
+def test_catalog_pages_are_not_crowded_out_by_page_links(monkeypatch):
+    menu = [{"url": f"https://www.uscis.gov/menu-{i}", "text": f"Menu {i}"} for i in range(60)]
+    calls, fetched = _wire(monkeypatch, [_plan(), _done()], pages={PAGE["url"]: dict(PAGE, links=menu)})
+    agent.check(CLAIM, "msu")
+    unread = [c["url"] for c in agent.catalog("msu", CFG) if c["url"] != PAGE["url"]]
+    assert all(f"- {u} | " in calls[1][1] for u in unread)
+    assert calls[1][1].count("\n- https://") <= agent.MAX_CANDIDATES
 
 
 def test_no_page_loads_falls_back(monkeypatch):
@@ -315,7 +400,18 @@ def test_pasted_message_gates_each_claim_separately(monkeypatch):
     assert results[1].verdict == "Contradicted" and fetched == [PAGE["url"]]
 
 
-def test_prompts_state_the_scope_and_distrust_their_inputs():
-    assert "in_scope" in agent.PLAN_PROMPT and "untrusted" in agent.PLAN_PROMPT
-    assert "untrusted" in agent.SPLIT_PROMPT
-    assert agent.STAY_ON_TASK in agent.JUDGE_PROMPT
+def test_call_turns_invalid_model_json_into_a_friendly_error(monkeypatch):
+    monkeypatch.setattr(pipeline, "_generate", lambda *a, **k: '{"urls": "not a list"}')
+    with pytest.raises(pipeline.CheckError, match="reliable answer"):
+        agent._call(agent._Plan, "s", "p")
+
+
+def test_failed_plan_call_shows_the_services_own_reason(monkeypatch):
+    def limited(*a, **k):
+        raise pipeline.CheckError("The checking service has reached its usage limit. Please try again later.")
+
+    monkeypatch.setenv("GEMINI_API_KEY", "x")
+    monkeypatch.setattr(agent, "_call", limited)
+    _no_fallback(monkeypatch)
+    r = agent.check(CLAIM, "msu")[0]
+    assert "usage limit" in r.explanation and r.verdict == "Unclear"

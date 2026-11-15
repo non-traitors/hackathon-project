@@ -24,6 +24,7 @@ If anything in the agent fails, the claim is handed to pipeline.check_claim.
 """
 from __future__ import annotations
 
+import logging
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -47,7 +48,10 @@ MAX_ROUNDS = 2  # follow-up rounds
 MAX_PAGES = 8  # pages read per claim, in total
 TIME_BUDGET = 45  # seconds per claim before the agent must answer
 MAX_CANDIDATES = 40  # further pages offered to the model at once
-MAX_LINKS = 40  # links kept per page
+MAX_LINKS = 15  # links kept per page
+UNAVAILABLE = "We couldn't check this right now. Please try again in a minute."
+
+log = logging.getLogger(__name__)
 LINK_TEXT_CHARS = 80
 
 
@@ -73,14 +77,21 @@ def catalog(school_key: str, config: dict) -> list[dict]:
 
 
 class _LinkExtractor(HTMLParser):
+    """Links in the page body. Site menus, headers and footers are skipped, as for the text."""
+
+    _SKIP = pipeline._TextExtractor._SKIP
+
     def __init__(self):
         super().__init__()
         self.links: list[tuple[str, str]] = []
         self._href: Optional[str] = None
         self._text: list[str] = []
+        self._skip = 0
 
     def handle_starttag(self, tag, attrs):
-        if tag == "a":
+        if tag in self._SKIP:
+            self._skip += 1
+        elif tag == "a" and not self._skip:
             self._href = dict(attrs).get("href")
             self._text = []
 
@@ -89,7 +100,9 @@ class _LinkExtractor(HTMLParser):
             self._text.append(data)
 
     def handle_endtag(self, tag):
-        if tag == "a" and self._href is not None:
+        if tag in self._SKIP and self._skip:
+            self._skip -= 1
+        elif tag == "a" and self._href is not None:
             self.links.append((self._href, " ".join(self._text)))
             self._href = None
 
@@ -122,8 +135,11 @@ def fetch(url: str, allowed: list[str]) -> Optional[dict]:
     """Fetch one allowlisted page: its text and its allowlisted links, or None.
 
     Same rules as pipeline._fetch_one; it also keeps the page's links so the
-    agent can offer them to the model.
+    agent can offer them to the model. The cache is shared by every school, so
+    the allowlist is checked here on every call, before the cache is read.
     """
+    if not pipeline._host_allowed(url, allowed):
+        return None
     hit = _cache.get(url)
     if hit and time.time() - hit[0] < pipeline.CACHE_TTL:
         return hit[1]
@@ -154,7 +170,8 @@ def fetch(url: str, allowed: list[str]) -> Optional[dict]:
                 }
     except Exception:
         doc = None  # unreadable pages are simply not used as evidence
-    _cache[url] = (time.time(), doc)
+    if doc:  # a failed fetch is not cached: the next check should try again
+        _cache[url] = (time.time(), doc)
     return doc
 
 
@@ -178,7 +195,7 @@ class _Split(BaseModel):
 
 
 class _Plan(BaseModel):
-    in_scope: bool = True
+    in_scope: bool  # required: a reply that leaves it out is rejected, not assumed in scope
     urls: list[str]
     search_terms: list[str]
 
@@ -281,15 +298,18 @@ def _plan_prompt(claim: str, context: dict, school_name: str, cat: list[dict]) -
 
 
 def _candidates(docs: list[dict], cat: list[dict], tried: set[str]) -> list[dict]:
-    """Pages the model may ask for next: links from pages read, then unread catalog pages."""
+    """Pages the model may ask for next: unread catalog pages first, then links from pages read.
+
+    Curated pages come first so page links can never push them off the list.
+    """
     out: dict[str, str] = {}
+    for c in cat:
+        if c["url"] not in tried:
+            out.setdefault(c["url"], "topics: " + ", ".join(c["topics"]))
     for d in docs:
         for link in d.get("links", []):
             if link["url"] not in tried:
                 out.setdefault(link["url"], link["text"] or "linked page")
-    for c in cat:
-        if c["url"] not in tried:
-            out.setdefault(c["url"], "topics: " + ", ".join(c["topics"]))
     return [{"url": u, "text": t} for u, t in list(out.items())[:MAX_CANDIDATES]]
 
 
@@ -332,7 +352,21 @@ def _check_one(claim: str, school_key: str, context: dict, language: str, config
         trace.append(s)
         return s
 
-    plan = _call(_Plan, PLAN_PROMPT, _plan_prompt(claim, context, school["name"], cat), "low")
+    try:
+        plan = _call(_Plan, PLAN_PROMPT, _plan_prompt(claim, context, school["name"], cat), "low")
+    except Exception as e:
+        # The plan call is also the scope gate. If it fails, scope is unknown, so
+        # fail closed: read nothing and do not hand the input to the fallback.
+        log.exception("plan call failed")
+        yield step("fallback", "Couldn't start the check", [type(e).__name__])
+        return AgentResult(
+            verdict="Unclear",
+            explanation=str(e) if isinstance(e, CheckError) else UNAVAILABLE,  # CheckError text is student-safe
+            checked_at=_now(),
+            school=school["name"],
+            claim=claim,
+            trace=trace,
+        )
     if not plan.in_scope:
         # Scope gate: stop before reading anything. The reply is fixed text, so
         # nothing else the model returned can reach the student.
@@ -360,8 +394,14 @@ def _check_one(claim: str, school_key: str, context: dict, language: str, config
         with ThreadPoolExecutor(max_workers=6) as pool:
             got = [d for d in pool.map(lambda u: fetch(u, allowed), batch) if d]
         for d in got:
-            d = dict(d, scope="school" if pipeline._host_allowed(d["url"], school["domains"]) else "federal")
-            docs.append(d)
+            docs.append(
+                dict(
+                    d,
+                    scope="school" if pipeline._host_allowed(d["url"], school["domains"]) else "federal",
+                    # A cached page may carry links filtered for another school's allowlist.
+                    links=[k for k in d.get("links", []) if pipeline._host_allowed(k["url"], allowed)],
+                )
+            )
         return got
 
     def read_step(got: list[dict]) -> Step:
@@ -466,16 +506,23 @@ def run(
     results: list[AgentResult] = []
     for claim in claims:
         trace = list(shared)
+        reason: list[str] = []
         try:
             result = yield from _check_one(claim, school_key, context, language, config, trace)
-        except Exception:  # any agent failure ends in the standard single-pass check
-            result = None
+        except Exception as e:  # a failure after the scope gate ends in the single-pass check
+            log.exception("agent failed, using the single-pass check")
+            result, reason = None, [type(e).__name__]
         if result is None:
-            fb = Step(kind="fallback", label="Using the standard check instead")
+            fb = Step(kind="fallback", label="Using the standard check instead", detail=reason)
             trace.append(fb)
             yield fb
-            plain = pipeline.check_claim(claim, school_key, context, language)
-            result = AgentResult(**plain.model_dump(), claim=claim, trace=trace)
+            try:
+                plain = pipeline.check_claim(claim, school_key, context, language)
+                result = AgentResult(**plain.model_dump(), claim=claim, trace=trace)
+            except CheckError as e:  # keep the other claims' results; CheckError text is student-safe
+                result = AgentResult(
+                    verdict="Unclear", explanation=str(e), checked_at=_now(), school=school["name"], claim=claim, trace=trace
+                )
         results.append(result)
     yield results
 
