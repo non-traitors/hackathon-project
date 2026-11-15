@@ -70,6 +70,10 @@ languages:
       empty_claim: 'Type or paste what you heard first.'
       try_again: 'Try again'
       we_heard: 'We heard this. Fix anything that is wrong, then check it.'
+      speak_how: "Tap the microphone below and say what you heard. Tap it again when you finish. Your recording goes to ElevenLabs to be turned into text. We don't keep it."
+      speak_close: "Close the recorder"
+      transcribing: "Writing down what you said…"
+      not_heard: "We couldn't make out the recording. Try again, or type what you heard."
       new_tab: 'opens in a new tab'
       checked_at: 'Checked {when}'
       step_read: 'Reading the official pages for your school'
@@ -129,6 +133,10 @@ languages:
       empty_claim: 'اكتب أو الصق ما سمعته أولاً.'
       try_again: 'حاول مرة أخرى'
       we_heard: 'هذا ما سمعناه. صحّح أي خطأ ثم اضغط للتحقق.'
+      speak_how: "اضغط على الميكروفون أدناه وقل ما سمعته، ثم اضغط مرة أخرى عند الانتهاء. يُرسل تسجيلك إلى ElevenLabs لتحويله إلى نص، ولا نحتفظ به."
+      speak_close: "إغلاق التسجيل"
+      transcribing: "نكتب ما قلته…"
+      not_heard: "لم نتمكن من فهم التسجيل. حاول مرة أخرى أو اكتب ما سمعته."
       new_tab: 'يفتح في علامة تبويب جديدة'
       checked_at: 'تم التحقق في {when}'
       step_read: 'قراءة الصفحات الرسمية الخاصة بجامعتك'
@@ -205,6 +213,10 @@ languages:
       empty_claim: '请先输入或粘贴你听到的内容。'
       try_again: '重试'
       we_heard: '这是我们听到的内容。请改正错误，然后开始核实。'
+      speak_how: "点击下方的麦克风，说出你听到的内容，说完后再点一次。你的录音会发送给 ElevenLabs 转成文字，我们不会保存。"
+      speak_close: "关闭录音"
+      transcribing: "正在记录你说的话……"
+      not_heard: "我们没能听清录音。请再试一次，或直接输入你听到的内容。"
       new_tab: '在新标签页中打开'
       checked_at: '核实时间：{when}'
       step_read: '正在阅读与你学校相关的官方页面'
@@ -281,6 +293,10 @@ languages:
       empty_claim: '請先輸入或貼上你聽到的內容。'
       try_again: '再試一次'
       we_heard: '這是我們聽到的內容。請改正錯誤，然後開始核實。'
+      speak_how: "撳下面嘅咪高峰，講出你聽到嘅內容，講完再撳一次。你嘅錄音會傳送去 ElevenLabs 轉成文字，我哋唔會保存。"
+      speak_close: "關閉錄音"
+      transcribing: "正在記錄你講嘅說話……"
+      not_heard: "我哋聽唔清楚段錄音。請再試一次，或者直接輸入你聽到嘅內容。"
       new_tab: '在新分頁開啟'
       checked_at: '核實時間：{when}'
       step_read: '正在閱讀與你學校相關的官方頁面'
@@ -357,6 +373,10 @@ languages:
       empty_claim: 'Сначала введите или вставьте то, что вы услышали.'
       try_again: 'Повторить'
       we_heard: 'Вот что мы услышали. Исправьте ошибки и нажмите «Проверить».'
+      speak_how: "Нажмите на микрофон ниже и скажите, что вы услышали. Нажмите ещё раз, когда закончите. Запись отправляется в ElevenLabs для преобразования в текст, мы её не храним."
+      speak_close: "Закрыть запись"
+      transcribing: "Записываем ваши слова…"
+      not_heard: "Не удалось разобрать запись. Попробуйте ещё раз или введите текст."
       new_tab: 'откроется в новой вкладке'
       checked_at: 'Проверено: {when}'
       step_read: 'Читаем официальные страницы вашего вуза'

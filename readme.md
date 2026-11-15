@@ -79,11 +79,11 @@ What the agent may decide is what to read. What it may not decide is the answer 
 - **Voice in.** `speech.transcribe(recording)` sends the recording to ElevenLabs speech to text (`scribe_v3`) and returns the text. The transcript then goes through the agent like anything typed, so the scope gate, the allowlist and the verified-quote rule all still apply.
 - **Voice out.** `speech.speak(speech.script(result))` returns MP3 audio of the verdict and explanation, using ElevenLabs text to speech (`eleven_v3`, which covers Cantonese as well as English, Arabic, Mandarin and Russian).
 
-In `app.py` this is a microphone under the text box on the home screen and a Listen button under each answer. Both calls need `ELEVENLABS_API_KEY`; without one, `speech.available()` is false and the interface should hide the voice controls. If ElevenLabs fails, the student sees a short message and can type instead; the written answer is never affected.
+In `app.py` this is a microphone button beside "Check it" and a Listen button under each answer. The microphone opens a recorder that says how to use it and where the recording goes. The transcript is added to the text box for the student to correct, and nothing is checked until they press "Check it". The browser only offers the microphone on `localhost` or over HTTPS. Both calls need `ELEVENLABS_API_KEY`; without one, `speech.available()` is false and the interface should hide the voice controls. If ElevenLabs fails, the student sees a short message and can type instead; the written answer is never affected.
 
 **What is sent to ElevenLabs:** the answer text, and the student's recording only when they choose to speak. Typed questions are never sent there.
 
-**Verified live on 2026-11-14:** an English answer was turned into audio (about 2 seconds) and transcribed back correctly (under 1 second), and the Listen button played a real answer in the app. Arabic, Mandarin, Cantonese and Russian audio has not been listened to by a speaker of those languages.
+**Verified live on 2026-11-14:** an English answer was turned into audio (about 2 seconds) and transcribed back correctly (under 1 second), and the Listen button played a real answer in the app. On 2026-11-15 the recorder was run end to end in a browser with a spoken English clip fed in as the microphone: it was recorded, transcribed by ElevenLabs and added to the text box. Nobody has spoken into a physical microphone yet. Arabic, Mandarin, Cantonese and Russian audio has not been listened to by a speaker of those languages.
 
 ## MVP scope
 

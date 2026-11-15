@@ -145,7 +145,8 @@ def answers(claim, language, school):
 
 def listen_to_question():
     """Voice in: put what the student said into the text box, for them to correct before checking."""
-    recording = st.audio_input(t("speak_label"))
+    st.markdown(f'<p class="small">{esc(t("speak_how"))}</p>', unsafe_allow_html=True)
+    recording = st.audio_input(t("speak_label"), label_visibility="collapsed")
     if recording is None:
         return
     audio = recording.getvalue()
@@ -153,12 +154,16 @@ def listen_to_question():
         return
     st.session_state["heard"] = hash(audio)
     try:
-        with st.spinner(t("progress")):
-            st.session_state["draft"] = speech.transcribe(audio)[:MAX_CHARS]
-        st.session_state["heard_note"] = True
-        st.session_state["recording"] = False  # the transcript is in the box: put the recorder away
-    except pipeline.CheckError as e:
-        st.error(str(e))
+        with st.spinner(t("transcribing")):
+            said = speech.transcribe(audio)
+    except pipeline.CheckError as e:  # the recorder stays open for another try
+        st.error(t("not_heard") if str(e) == speech.NOT_HEARD else str(e))
+        return
+    typed = st.session_state.get("draft", "").strip()
+    st.session_state["draft"] = f"{typed} {said}".strip()[:MAX_CHARS]
+    st.session_state["heard_note"] = True
+    st.session_state["recording"] = False  # the transcript is in the box: put the recorder away
+    st.rerun()
 
 
 # ---------- Screens ----------
@@ -176,9 +181,10 @@ def home():
                 f'<p class="lead">{esc(t("tagline"))}</p></div>', unsafe_allow_html=True)
     beta_notice()
 
-    asking, recorder = st.container(), st.container()
+    recording = speech.available() and st.session_state.get("recording")
+    asking, recorder, after = st.container(), st.container(key="recorder"), st.container()
     with recorder:  # runs first so a transcript can fill the text box above it
-        if speech.available() and st.session_state.get("recording"):
+        if recording:
             listen_to_question()
     with asking:
         if st.session_state.get("heard_note"):
@@ -188,8 +194,10 @@ def home():
         with st.container(key="actions"):  # microphone and main button side by side
             if speech.available():
                 mic_col, check_col = st.columns([1, 5])
-                if mic_col.button(t("speak_label"), key="mic", icon=":material/mic:"):
-                    st.session_state["recording"] = not st.session_state.get("recording")
+                label, icon = (("speak_close", ":material/close:") if recording
+                               else ("speak_label", ":material/mic:"))
+                if mic_col.button(t(label), key="mic", icon=icon):  # opens the recorder, or puts it away
+                    st.session_state["recording"] = not recording
                     st.rerun()
             else:
                 check_col = st.container()
@@ -197,7 +205,7 @@ def home():
                 if text.strip():
                     go("result", text.strip())
                 st.warning(t("empty_claim"))
-        st.markdown(f'<p class="small">🔒 {esc(t("privacy_note"))}</p>', unsafe_allow_html=True)
+    after.markdown(f'<p class="small">🔒 {esc(t("privacy_note"))}</p>', unsafe_allow_html=True)
 
     st.markdown(f'<div class="label">{esc(t("starters_label"))}</div>', unsafe_allow_html=True)
     with st.container(key="examples"):

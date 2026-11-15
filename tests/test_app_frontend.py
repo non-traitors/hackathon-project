@@ -259,6 +259,8 @@ def test_spoken_question_is_shown_for_correction_before_any_check(monkeypatch):
 def test_unheard_recording_shows_the_message_and_keeps_the_home_screen(monkeypatch):
     import streamlit as st
 
+    import languages as langs
+
     class Recording:
         def getvalue(self):
             return b"RIFFdata"
@@ -272,7 +274,7 @@ def test_unheard_recording_shows_the_message_and_keeps_the_home_screen(monkeypat
     monkeypatch.setattr(st, "audio_input", lambda *a, **k: Recording())
     at = AppTest.from_file(APP, default_timeout=30).run()
     at.button(key="mic").click().run()
-    assert not at.exception and any(speech.NOT_HEARD in e.value for e in at.error)
+    assert not at.exception and [e.value for e in at.error] == [langs.ui_text("en", "not_heard")]
     assert len(at.button) >= 6  # starters and Check it are still there
 
 
@@ -295,3 +297,106 @@ def test_check_button_comes_before_the_examples(app):
 
 def test_no_microphone_without_a_voice_key(app):
     assert all(b.key != "mic" for b in app.button)
+
+
+# ------------------------------------------------------------- the voice recorder
+def _how(code):
+    """The recorder's instructions as they appear in the page."""
+    import html as htmllib
+
+    import languages as langs
+
+    return htmllib.escape(langs.ui_text(code, "speak_how"))
+
+
+def _voice_app(monkeypatch, recording=b"RIFFdata", transcribe=lambda audio: "Is OPT cancelled"):
+    """The app with a voice key. `at.recorder` lists every time the recorder was drawn."""
+    import streamlit as st
+
+    class Recording:
+        def getvalue(self):
+            return recording
+
+    drawn = []
+    monkeypatch.setattr(pipeline, "warm_pages", lambda *a, **k: 0)
+    monkeypatch.setattr(pipeline, "check_claim", lambda *a: _result())
+    monkeypatch.setattr(speech, "available", lambda: True)
+    monkeypatch.setattr(speech, "transcribe", transcribe)
+    monkeypatch.setattr(st, "audio_input", lambda *a, **k: drawn.append(a) or (Recording() if recording else None))
+    monkeypatch.delenv("USE_AGENT", raising=False)
+    at = AppTest.from_file(APP, default_timeout=30).run()
+    at.recorder = drawn
+    return at
+
+
+def test_open_recorder_says_how_to_use_it_and_where_the_recording_goes(monkeypatch):
+    import languages as langs
+
+    at = _voice_app(monkeypatch, recording=None)
+    how = _how("en")
+    assert "ElevenLabs" in how and how not in _html(at)
+    at.button(key="mic").click().run()
+    page = _html(at)
+    assert how in page and page.index(how) < page.index("Nothing you type is saved")
+    assert at.button(key="mic").label == langs.ui_text("en", "speak_close")
+    at.button(key="mic").click().run()  # the same button puts the recorder away
+    drawn = len(at.recorder)
+    at.run()
+    assert len(at.recorder) == drawn and at.button(key="mic").label == langs.ui_text("en", "speak_label")
+
+
+def test_recorder_closes_once_the_transcript_is_in_the_box(monkeypatch):
+    import languages as langs
+
+    at = _voice_app(monkeypatch)
+    at.button(key="mic").click().run()
+    assert at.text_area[0].value == "Is OPT cancelled"
+    assert len(at.recorder) == 1 and _how("en") not in _html(at)
+
+
+def test_spoken_words_are_added_to_what_was_already_typed(monkeypatch):
+    at = _voice_app(monkeypatch, recording=None)
+    at.text_area[0].set_value("My friend said this:").run()
+    monkeypatch.setattr(speech, "transcribe", lambda audio: "OPT is cancelled")
+    import streamlit as st
+
+    class Recording:
+        def getvalue(self):
+            return b"RIFFdata"
+
+    monkeypatch.setattr(st, "audio_input", lambda *a, **k: Recording())
+    at.button(key="mic").click().run()
+    assert at.text_area[0].value == "My friend said this: OPT is cancelled"
+
+
+def test_writing_down_a_recording_does_not_claim_to_read_official_sources(monkeypatch):
+    import contextlib
+
+    import streamlit as st
+
+    import languages as langs
+
+    shown = []
+
+    @contextlib.contextmanager
+    def spinner(text, **kw):
+        shown.append(text)
+        yield
+
+    monkeypatch.setattr(st, "spinner", spinner)
+    at = _voice_app(monkeypatch)
+    at.button(key="mic").click().run()
+    assert shown == [langs.ui_text("en", "transcribing")]
+
+
+def test_unheard_recording_is_explained_in_the_chosen_language(monkeypatch):
+    import languages as langs
+
+    def unheard(audio):
+        raise pipeline.CheckError(speech.NOT_HEARD)
+
+    at = _voice_app(monkeypatch, transcribe=unheard)
+    at.selectbox[1].set_value("Русский").run()
+    at.button(key="mic").click().run()
+    assert [e.value for e in at.error] == [langs.ui_text("ru", "not_heard")]
+    assert _how("ru") in _html(at)  # the recorder stays open for another try

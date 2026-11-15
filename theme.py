@@ -173,5 +173,13 @@ div.stButton > button[kind="primary"], div.stButton > button[data-testid="stBase
 /* Example claims read as full-width rows that wrap, not as centred buttons. */
 .st-key-examples [data-testid="stElementContainer"], .st-key-examples div.stButton {{ width:100%; }}
 .st-key-examples div.stButton > button {{ justify-content:flex-start; text-align:start; padding:.7rem 1rem; }}
+.st-key-examples div.stButton > button > div {{ justify-content:flex-start; }}
 .st-key-examples div.stButton > button p {{ text-align:start; }}
+/* The recorder opens right under the microphone, as one soft panel. */
+.st-key-recorder:has([data-testid="stAudioInput"]) {{ background:{SOFT}; border-radius:12px; padding:12px 14px; gap:.5rem; }}
+.st-key-recorder p.small {{ margin:0 0 .6rem; color:{NAVY}; }}
+/* When the browser blocks the microphone, the recorder explains how to allow it. On a phone that
+   message is taller than the recorder, so the recorder grows instead of cutting it off. */
+.st-key-recorder [data-testid="stAudioInput"] > div {{ height:auto; min-height:68px; background:white; }}
+.st-key-recorder [data-testid="stAudioInput"] > div > div > div:first-child {{ font-size:.85rem; line-height:1.4; padding:8px 0; }}
 {_stone_css()}"""

@@ -44,7 +44,7 @@ When the answer is Unclear, it does not leave you there. It writes the question 
 
 **Languages.** One registry file holds the interface text, a glossary of key terms, and routing keywords for each language.
 
-**Tests.** 189 automated tests run without any API key. They cover the quote check, the allowlist, the limits, the fallback, and the scope gate.
+**Tests.** 232 automated tests run without any API key. They cover the quote check, the allowlist, the limits, the fallback, and the scope gate.
 
 ## Challenges we ran into
 
@@ -62,7 +62,7 @@ When the answer is Unclear, it does not leave you there. It writes the question 
 - A golden set of real rumors that passes against live official pages, in English and Arabic.
 - An agent that is bounded by code, not by hope: fixed limits, a fixed allowlist, and a scope gate that fails closed.
 - Voice that works in both directions: ask out loud, and listen to the answer.
-- 189 tests written in 24 hours, and a review that found real bugs before the judges did.
+- 232 tests written in 24 hours, and a review that found real bugs before the judges did.
 
 ## What we learned
 
@@ -97,10 +97,10 @@ The rules ask us to say which AI tools we used and how.
 
 These lines in the draft are ahead of what is verified or shipped right now. Fix the product or soften the sentence.
 
-1. **"You can also ask by voice and listen to the answer."** The voice module works live, but the mic and Listen buttons are not in `app.py` yet.
+1. **"You can also ask by voice and listen to the answer."** Both are in the app now. Voice in was run end to end in a browser with a spoken English clip fed in as the microphone. Nobody has spoken into a physical microphone yet, so try it once on the demo laptop and allow the microphone when the browser asks.
 2. **The agent.** It is built and passes its offline tests, but it has not completed a live run, and `app.py` still uses the simple checker. If that is still true at noon, change "we built a bounded agent" to say it ships behind a switch, and do not demo it as the default.
 3. **"A golden set that passes in English and Arabic."** This comes from the readme's note on the earlier live run. Rerun it after the merge before repeating the claim.
 4. **Languages.** The registry marks the non English languages as drafts not yet reviewed by a native speaker. "What's next" says so, but make sure the app shows its beta notice in the demo.
 5. **Voice in other languages.** The audio round trip was verified in English. Arabic, Mandarin, Cantonese and Russian audio has not been checked by a speaker.
-6. **Test count.** 189 on the `feature/agent` branch. Update the number if it changes.
+6. **Test count.** 232 on `main`. Update the number if it changes.
 7. **Required attachments:** a public GitHub link and a demo video of 3 minutes or less.
