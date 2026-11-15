@@ -310,3 +310,45 @@ def test_analyze_bad_json_is_friendly(monkeypatch):
     monkeypatch.setattr(pipeline, "_generate", lambda *a, **k: "not json", raising=False)
     with pytest.raises(CheckError, match="reliable answer"):
         pipeline.analyze("claim", {}, "msu", DOCS, "English")
+
+
+def test_generate_does_not_retry_inside_the_sdk(monkeypatch):
+    """A 429 must fail fast: the SDK's own retries honour Retry-After and can sleep for hours."""
+    import types
+
+    import google.genai as genai
+
+    seen = {}
+
+    class FakeClient:
+        def __init__(self, **kw):
+            seen.update(kw)
+            self.interactions = self
+
+        def create(self, **kw):
+            return types.SimpleNamespace(output_text="{}")
+
+    monkeypatch.setenv("GEMINI_API_KEY", "x")
+    monkeypatch.setattr(genai, "Client", FakeClient)
+    assert pipeline._generate("s", "p", {}) == "{}"
+    assert seen["http_options"]["retry_options"] == {"attempts": 1}
+    assert seen["http_options"]["timeout"] == pipeline.REQUEST_TIMEOUT_MS
+
+
+def test_rate_limit_error_is_a_friendly_message(monkeypatch):
+    import google.genai as genai
+
+    class Limited(Exception):
+        status_code = 429
+
+    class FakeClient:
+        def __init__(self, **kw):
+            self.interactions = self
+
+        def create(self, **kw):
+            raise Limited("Too Many Requests")
+
+    monkeypatch.setenv("GEMINI_API_KEY", "x")
+    monkeypatch.setattr(genai, "Client", FakeClient)
+    with pytest.raises(CheckError, match="usage limit"):
+        pipeline._generate("s", "p", {})

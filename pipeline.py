@@ -404,7 +404,11 @@ def _generate(system: str, prompt: str, schema: dict, thinking: Optional[str] = 
     if thinking:
         cfg["thinking_level"] = thinking
     try:
-        client = genai.Client(api_key=key, http_options={"timeout": REQUEST_TIMEOUT_MS})
+        # No retries inside the SDK: on HTTP 429 it honours Retry-After, which can be
+        # hours (seen live: 21652 s), and the check would hang instead of failing.
+        client = genai.Client(
+            api_key=key, http_options={"timeout": REQUEST_TIMEOUT_MS, "retry_options": {"attempts": 1}}
+        )
         interaction = client.interactions.create(
             model=os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL,
             input=prompt,
