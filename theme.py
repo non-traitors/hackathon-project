@@ -126,7 +126,13 @@ def css() -> str:
 @import url('{FONTS_URL}');
 {LOCAL_FONTS}
 html, body, [class*="css"] {{ font-family:{SANS}; color:{NAVY}; }}
-.block-container {{ max-width:480px; padding-top:1.5rem; }}
+.block-container {{ max-width:680px; padding:1.5rem 1rem 3rem; }}
+/* A website reads on any screen: a comfortable column on a laptop, the whole width on a phone. */
+@media (min-width: 720px) {{
+  .block-container {{ padding-top:2.5rem; }}
+  .hero .lead {{ max-width:30em; }}
+  .st-key-examples.stVerticalBlock {{ display:grid; grid-template-columns:1fr 1fr; gap:.6rem 1rem; }}
+}}
 #MainMenu, footer, header {{ visibility:hidden; }}
 .small {{ font-size:.85rem; color:{GRAY}; }}
 .sr {{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }}

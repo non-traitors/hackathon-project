@@ -7,6 +7,18 @@ backgroundColor = "#FFFFFF"
 secondaryBackgroundColor = "#EEF1F8"
 textColor = "#1B2F5B"
 
-# Serves static/ (the bundled fonts) at app/static/.
 [server]
+# Serves static/ (the bundled fonts) at app/static/.
 enableStaticServing = true
+# A website host runs the server with no terminal: never open a browser or ask for an email.
+headless = true
+# Hosts that probe a URL can use /_stcore/health (returns "ok").
+
+[browser]
+gatherUsageStats = false
+
+[client]
+# Visitors see the page, not Streamlit's developer menu or Deploy button.
+toolbarMode = "viewer"
+# A public site shows a generic message on an error, never a stack trace.
+showErrorDetails = "none"

@@ -167,7 +167,7 @@ The checker should:
 | Requests and pypdf | Fetch official pages and read their text (HTML and PDF). |
 | Gemini API (`google-genai`, Interactions API) | Evidence analysis and explanations in the selected language. Default model `gemini-4-hydrogen` at `medium` thinking, overridable with `GEMINI_MODEL` and `GEMINI_THINKING`. In an eight-claim benchmark `low` thinking took about 6 s against about 9 s for `medium`, but cited fewer sources on three claims, so `medium` stays the default. Needs Python 3.10 or newer. |
 
-Deployment details will be documented when the application is deployed.
+It runs as a website: Streamlit serves the page, and the steps to put it online are in [Run it as a website](#run-it-as-a-website).
 
 ## Getting started
 
@@ -182,13 +182,45 @@ Set up and run the offline tests (no API key needed). Use Python 3.10 or newer; 
 
 ```bash
 python3.13 -m venv .venv313   # any Python 3.10+
-.venv313/bin/pip install -r requirements.txt
+.venv313/bin/pip install -r requirements-dev.txt
 .venv313/bin/python -m pytest
 ```
 
-To run the checker against the Gemini API you need a Gemini API key. Copy `.env.example` to `.env` and set `GEMINI_API_KEY`; keep real keys in `.env`, local environment variables, or the deployment platform's secret store, never in version control. Then start the app with `.venv313/bin/streamlit run app.py`. It reads the key from `.env` (or Streamlit secrets on a deployment).
+To run the checker against the Gemini API you need a Gemini API key. Copy `.env.example` to `.env` and set `GEMINI_API_KEY`; keep real keys in `.env`, local environment variables, or the deployment platform's secret store, never in version control. Then start the website with `.venv313/bin/streamlit run app.py` and open <http://localhost:8501>. It reads the keys from `.env`, or from Streamlit secrets on a deployment.
 
 The first milestone is reached: claims are checked end to end through the real interface with a live key, in all five languages' pipeline paths. Still to do: native-speaker review of the non-English text, deployment, and a faster first answer (see Limitations).
+
+### Run it as a website
+
+The interface is a Streamlit web app, so it is a website: anyone with the link opens it in a browser, on a laptop or a phone. The page is one centered column that uses the full width on a phone and about 680 px on a laptop. Server settings for a public site (no developer toolbar, generic error messages, no usage tracking) are in `.streamlit/config.toml`.
+
+**Streamlit Community Cloud (free, gives an https link)**
+
+1. Push the repository to GitHub and choose **Create app** at <https://share.streamlit.io>. Pick the repository, branch `main`, and main file `app.py`.
+2. Under **Advanced settings**, choose Python 3.10 or newer (3.12 is a good pick) and paste the keys as secrets:
+
+   ```toml
+   GEMINI_API_KEY = "your key"
+   ELEVENLABS_API_KEY = "your key"   # optional: turns on voice
+   ```
+
+3. Deploy. The app copies the secrets into the environment at start (`_load_key` in `app.py`), so no code changes are needed.
+
+**Any other host (Render, Railway, Fly.io, a VPS)**
+
+```bash
+pip install -r requirements.txt
+streamlit run app.py --server.address 0.0.0.0 --server.port "$PORT"
+```
+
+Set `GEMINI_API_KEY` (and optionally `ELEVENLABS_API_KEY`, `USE_AGENT=1`) as environment variables. A host that wants a health check can use `/_stcore/health`.
+
+Notes for a public site:
+
+- Serve it over **https**. Browsers only allow the microphone on https (and on `localhost`); Community Cloud and most hosts do this for you.
+- Checks use one shared Gemini key, so the app limits uncached checks to 30 a minute (`CHECKS_PER_MINUTE`). Set a spending limit on the key as well.
+- The first visit after a restart downloads the official pages in the background, so the very first check can take a few seconds longer.
+- Streamlit controls the page's `<head>`, so the site has a title and icon but no custom social-preview image.
 
 ### Proposed file layout
 

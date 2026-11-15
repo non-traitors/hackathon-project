@@ -1,0 +1,3 @@
+# For working on the project: everything the website needs, plus the tests.
+-r requirements.txt
+pytest

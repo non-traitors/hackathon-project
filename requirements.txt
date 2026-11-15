@@ -1,3 +1,4 @@
+# What the website needs to run. Tests are in requirements-dev.txt.
 streamlit
 google-genai>=3.3  # Interactions API; needs Python 3.10+ (not 3.9)
 requests
@@ -5,4 +6,3 @@ pypdf
 pydantic
 pyyaml
 python-dotenv
-pytest
