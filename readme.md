@@ -70,6 +70,12 @@ What the agent may decide is what to read. What it may not decide is the answer 
 
 `backend.py` exposes this to the interface as `check_claim(claim, language, school)`, in the same shape as the placeholder in `app.py`, and as `stream(...)`, which also yields each step for a live progress display.
 
+**Staying on topic.** The planning step also decides whether the input is about being an international student in the United States. If it is not, the agent stops before reading any page and returns a fixed reply written in code, which the model cannot change. This gate is one layer of several: every prompt treats the claim, the pasted message and page text as untrusted, the model can only open URLs it was shown, and a verdict still needs a verified quote. The interface shows these results with an **Out of scope** label.
+
+### Read aloud
+
+`speech.py` turns an answer into audio with ElevenLabs text to speech, so a student can listen to the verdict and explanation in the answer language. It is one function, `speech.speak(speech.script(result))`, returning MP3 bytes for `st.audio`. Only the answer text is sent to ElevenLabs, never the student's own message. It needs `ELEVENLABS_API_KEY`; without one, `speech.available()` is false and the interface should hide the button. It is covered by offline tests and **has not been run against the live ElevenLabs API yet**. The default model is multilingual; Uzbek support is unconfirmed.
+
 ## MVP scope
 
 - [ ] Claim input and answer-language selector.
@@ -175,6 +181,7 @@ hackathon-project/
 ├── pipeline.py        # Fetch official pages, call Gemini, verify citations (single-pass check)
 ├── agent.py           # Bounded agent: plans what to read, follows official links, verifies quotes
 ├── backend.py         # Bridge for app.py: check_claim(claim, language, school) and a live step stream
+├── speech.py          # Read an answer aloud with ElevenLabs text to speech
 ├── sources.yaml       # Allowlist, topic keywords, curated source pages
 ├── requirements.txt   # Python dependencies
 ├── .env.example       # Configuration template with no real keys (GEMINI_API_KEY, optional model and thinking level)
@@ -245,6 +252,7 @@ Students at other institutions should confirm with their own international stude
 The hackathon rules ask teams to say which AI tools they used and how.
 
 - **Gemini API** is part of the product: it reads the fetched official pages and writes the explanation.
-- **Claude Code** was used to audit the repository and to write `agent.py`, `backend.py` and their tests, from a design and plan the team reviewed (`docs/superpowers/`).
+- **ElevenLabs** is part of the product: it reads the answer aloud (`speech.py`).
+- **Claude Code** was used to audit the repository and to write `agent.py`, `backend.py`, `speech.py` and their tests, from a design and plan the team reviewed (`docs/superpowers/`).
 - **ChatGPT** was used for the original project discussion linked at the top of this file.
 - _Team: add any other tools used for the pipeline, the interface or the design here before submitting._
