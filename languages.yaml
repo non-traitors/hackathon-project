@@ -51,6 +51,19 @@ languages:
       date_unknown: Date not shown
       out_of_scope: This is outside what we can check. Please ask your school's international student office.
       new_check: "← New check"
+      home_eyebrow: "CLARITY FOR F-1 STUDENTS"
+      home_title: "OPT check"
+      home_subtitle: "Clear answers to F-1 OPT rumors."
+      sources_note: "We look for government & university sources."
+      box_title: "Less guesswork. More context."
+      box_body: "See what the sources say, what is still uncertain, and where to go next."
+      your_question: "YOUR QUESTION"
+      sources_found: "{n} found"
+      view: "View"
+      ask_office_button: "Ask your student office"
+      last_updated: "Last updated"
+      legend_title: "What each verdict means"
+      legend_note: "A proposal is not a rule in effect."
     glossary: {}
     keywords: {}
 
@@ -86,6 +99,19 @@ languages:
       date_unknown: التاريخ غير معروض
       out_of_scope: هذا خارج ما يمكننا التحقق منه. يرجى سؤال مكتب الطلاب الدوليين في جامعتك.
       new_check: "← تحقق جديد"
+      home_eyebrow: "وضوح لطلاب F-1"
+      home_title: "فحص OPT"
+      home_subtitle: "إجابات واضحة عن شائعات OPT لطلاب F-1."
+      sources_note: "نبحث في مصادر حكومية وجامعية."
+      box_title: "تخمين أقل. سياق أكثر."
+      box_body: "اطّلع على ما تقوله المصادر، وما لا يزال غير مؤكد، وإلى أين تتجه بعد ذلك."
+      your_question: "سؤالك"
+      sources_found: "تم العثور على {n}"
+      view: "عرض"
+      ask_office_button: "اسأل مكتب الطلاب في جامعتك"
+      last_updated: "آخر تحديث"
+      legend_title: "ماذا تعني كل نتيجة"
+      legend_note: "الاقتراح ليس قاعدة سارية المفعول."
     glossary:
       OPT: التدريب العملي الاختياري (OPT)
       STEM OPT: تمديد التدريب العملي لتخصصات STEM (STEM OPT)
@@ -138,6 +164,19 @@ languages:
       date_unknown: 未显示日期
       out_of_scope: 这超出了我们能核实的范围。请咨询学校的国际学生办公室。
       new_check: "← 重新核实"
+      home_eyebrow: "为F-1学生提供清晰答案"
+      home_title: "OPT核实"
+      home_subtitle: "清楚解答关于F-1 OPT的传言。"
+      sources_note: "我们查找政府和大学的官方来源。"
+      box_title: "少一点猜测，多一点背景。"
+      box_body: "看看来源怎么说、哪些仍不确定，以及下一步该去哪里。"
+      your_question: "你的问题"
+      sources_found: "找到{n}个"
+      view: "查看"
+      ask_office_button: "咨询你的学生办公室"
+      last_updated: "最后更新"
+      legend_title: "各个结论的含义"
+      legend_note: "提案不等于已生效的规定。"
     glossary:
       OPT: 选择性实习培训（OPT）
       STEM OPT: STEM OPT延期（24个月）
@@ -190,6 +229,19 @@ languages:
       date_unknown: 未有顯示日期
       out_of_scope: 呢個超出咗我哋可以核實嘅範圍。請向學校嘅國際學生辦公室查詢。
       new_check: "← 重新核實"
+      home_eyebrow: "為F-1學生提供清晰答案"
+      home_title: "OPT核實"
+      home_subtitle: "清楚解答有關F-1 OPT嘅傳言。"
+      sources_note: "我哋搜尋政府同大學嘅官方來源。"
+      box_title: "少啲估，多啲背景。"
+      box_body: "睇下來源點講、邊啲仍然未確定，以及下一步可以去邊度。"
+      your_question: "你嘅問題"
+      sources_found: "搵到{n}個"
+      view: "查看"
+      ask_office_button: "聯絡你嘅學生辦公室"
+      last_updated: "最後更新"
+      legend_title: "各個結論嘅意思"
+      legend_note: "建議並不等於已生效嘅規定。"
     glossary:
       OPT: 選擇性實習培訓（OPT）
       STEM OPT: STEM OPT延期（24個月）
@@ -242,6 +294,19 @@ languages:
       date_unknown: Дата не указана
       out_of_scope: Это выходит за рамки того, что мы можем проверить. Обратитесь в офис международных студентов вашего университета.
       new_check: "← Новая проверка"
+      home_eyebrow: "ЯСНОСТЬ ДЛЯ СТУДЕНТОВ F-1"
+      home_title: "Проверка OPT"
+      home_subtitle: "Понятные ответы на слухи об OPT для студентов F-1."
+      sources_note: "Мы ищем в государственных и университетских источниках."
+      box_title: "Меньше догадок. Больше контекста."
+      box_body: "Посмотрите, что говорят источники, что остаётся неясным и куда обратиться дальше."
+      your_question: "ВАШ ВОПРОС"
+      sources_found: "найдено: {n}"
+      view: "Открыть"
+      ask_office_button: "Написать в офис для студентов"
+      last_updated: "Обновлено"
+      legend_title: "Что означает каждый вердикт"
+      legend_note: "Предложенное правило — это не действующее правило."
     glossary:
       OPT: Опциональная практическая подготовка (OPT)
       STEM OPT: Продление OPT для STEM-специальностей (STEM OPT)
