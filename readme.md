@@ -56,7 +56,7 @@ The verdict labels will stay in English across languages. The explanation will u
 
 ### Agent mode
 
-`agent.py` adds a bounded agent on top of the single-pass check. It is implemented and covered by offline tests; **it has not been run against the live Gemini API yet**, so its accuracy and speed are unmeasured (`tests/live_golden.py` has the live cases, run with `-k agent`).
+`agent.py` adds a bounded agent on top of the single-pass check. It has been run live against the Gemini API (2026-11-14): its golden claims and the pasted-message test pass, with the same verdicts as the single-pass check. Claims it answers in one reading round take about 10 to 13 seconds, the same as the single-pass check; claims that need extra rounds take about 26 to 34 seconds, and the extra time does not always help (the OPT fee claim took 34 seconds and still ended **Unclear**, because no allowed page's text states the fee). The tests are in `tests/live_golden.py`, run with `-k agent`.
 
 For each claim the agent works in visible steps:
 
@@ -77,9 +77,21 @@ What the agent may decide is what to read. What it may not decide is the answer 
 `speech.py` lets a student speak a question and listen to the answer, using ElevenLabs.
 
 - **Voice in.** `speech.transcribe(recording)` sends the recording to ElevenLabs speech to text (`scribe_v3`) and returns the text. The transcript then goes through the agent like anything typed, so the scope gate, the allowlist and the verified-quote rule all still apply.
-- **Voice out.** `speech.speak(speech.script(result))` returns MP3 audio of the verdict and explanation, using ElevenLabs text to speech (`eleven_v3`, which covers Cantonese as well as English, Arabic, Mandarin and Russian).
+- **Voice out.** `speech.speak(speech.script(result), language=...)` returns MP3 audio of the verdict and explanation, using ElevenLabs text to speech (`eleven_v3`, which covers Cantonese as well as English, Arabic, Mandarin and Russian).
 
 In `app.py` this is a microphone button beside "Check it" and a Listen button under each answer. The microphone opens a recorder that says how to use it and where the recording goes. The transcript is added to the text box for the student to correct, and nothing is checked until they press "Check it". The browser only offers the microphone on `localhost` or over HTTPS. Both calls need `ELEVENLABS_API_KEY`; without one, `speech.available()` is false and the interface should hide the voice controls. If ElevenLabs fails, the student sees a short message and can type instead; the written answer is never affected.
+
+**Language settings.** Each interface language has fixed ElevenLabs language codes in `languages.yaml`, so speech is not left to guesswork:
+
+| Interface language | Speech to text (Scribe) | Text to speech (Eleven v3) |
+| --- | --- | --- |
+| English | `eng` (the app leaves speech to text on auto-detect) | `en` |
+| Arabic | `ara` | `ar` |
+| Mandarin Chinese (Simplified) | `zho` | `zh` |
+| **繁體中文 = Cantonese (粵語)** | **`yue`** | **`yue`** |
+| Russian | `rus` | `ru` |
+
+繁體中文 is always Cantonese (`yue`), never Mandarin; Cantonese has no two-letter code, so ElevenLabs uses the three-letter `yue`. Read-aloud always sends the answer's language. The microphone sends the interface language as the expected language, except English, because an English-interface student may speak another language. If ElevenLabs rejects a code, or hears nothing with it, the request is repeated once without a code (auto-detect), which is the previous behavior. The codes come from ElevenLabs' published language lists and are checked by offline tests; **they have not been tried against the live ElevenLabs service** (no ElevenLabs key was available when they were added), so Cantonese in particular needs a listen by a Cantonese speaker.
 
 **What is sent to ElevenLabs:** the answer text, and the student's recording only when they choose to speak. Typed questions are never sent there.
 

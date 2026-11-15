@@ -107,3 +107,17 @@ def topic_keywords(topic: str) -> list[str]:
         for name in (topic, *KEYWORD_ALIASES.get(topic, ())):
             out += [str(k) for k in kws.get(name, [])]
     return out
+
+
+def speech_code(value: Optional[str], kind: str) -> Optional[str]:
+    """ElevenLabs language code for a language: kind is "stt" (speech to text) or "tts".
+
+    `value` may be a registry code or any name the picker uses (e.g. 繁體中文 gives yue,
+    Cantonese). An unknown name gives None, so the caller lets ElevenLabs auto-detect
+    rather than guessing a wrong language.
+    """
+    try:
+        code = resolve_language(value, strict=True)
+    except ValueError:
+        return None
+    return (load_languages()[code].get("speech") or {}).get(kind)

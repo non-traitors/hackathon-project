@@ -15,6 +15,10 @@
 #   verdicts     localized labels; the English label is always shown too
 #   ui           static interface strings ({office} is filled in by the app)
 #   glossary     fixed wording for key terms; acronyms stay in Latin letters
+#   speech       ElevenLabs language codes. stt = speech-to-text (Scribe), as listed in
+#                ElevenLabs' language list: eng, ara, zho, yue, rus. tts = text-to-speech
+#                (Eleven v3): en, ar, zh, ru, and yue for Cantonese, which has no two-letter
+#                code. 繁體中文 is Cantonese (yue), NOT Mandarin (zho / zh).
 #   keywords     claim words (in this language) that route to a topic; matched
 #                as substrings for non-Latin scripts and as whole words otherwise
 
@@ -25,6 +29,7 @@ languages:
     model_name: English
     rtl: false
     reviewed: true
+    speech: {stt: eng, tts: en}
     verdicts: {Supported: Supported, Contradicted: Contradicted, Unclear: Unclear,
                In effect: In effect, Proposed only: Proposed only, Blocked: Blocked}
     ui:
@@ -88,6 +93,7 @@ languages:
     model_name: Arabic (Modern Standard Arabic)
     rtl: true
     reviewed: false
+    speech: {stt: ara, tts: ar}
     verdicts: {Supported: مدعوم بالمصادر, Contradicted: يتعارض مع المصادر, Unclear: غير واضح,
                In effect: ساري المفعول, Proposed only: مقترح فقط, Blocked: موقوف}
     ui:
@@ -168,6 +174,7 @@ languages:
     model_name: Mandarin Chinese (Simplified characters)
     rtl: false
     reviewed: false
+    speech: {stt: zho, tts: zh}
     verdicts: {Supported: 有官方依据, Contradicted: 与官方信息不符, Unclear: 不明确,
                In effect: 已生效, Proposed only: 仅为提案, Blocked: 已被阻止}
     ui:
@@ -248,6 +255,7 @@ languages:
     model_name: "Cantonese as written in Hong Kong: Traditional Chinese characters in a plain written style that Cantonese speakers read easily"
     rtl: false
     reviewed: false
+    speech: {stt: yue, tts: yue}
     verdicts: {Supported: 有官方根據, Contradicted: 與官方資料不符, Unclear: 未能確定,
                In effect: 已生效, Proposed only: 只係建議, Blocked: 已被阻止}
     ui:
@@ -328,6 +336,7 @@ languages:
     model_name: Russian
     rtl: false
     reviewed: false
+    speech: {stt: rus, tts: ru}
     verdicts: {Supported: Подтверждается официальными источниками, Contradicted: Противоречит официальным источникам, Unclear: Неясно,
                In effect: Действует, Proposed only: Только предложено, Blocked: Заблокировано}
     ui:

@@ -143,6 +143,15 @@ def answers(claim, language, school):
     return results
 
 
+
+def _spoken_language():
+    """The language to expect when the student speaks: the one they picked (繁體中文 is
+    Cantonese). English is left to auto-detect, since an English-interface student may
+    well speak another language."""
+    code = lang_code()
+    return None if code == "en" else code
+
+
 def listen_to_question():
     """Voice in: put what the student said into the text box, for them to correct before checking."""
     st.markdown(f'<p class="small">{esc(t("speak_how"))}</p>', unsafe_allow_html=True)
@@ -155,7 +164,7 @@ def listen_to_question():
     st.session_state["heard"] = hash(audio)
     try:
         with st.spinner(t("transcribing")):
-            said = speech.transcribe(audio)
+            said = speech.transcribe(audio, language=_spoken_language())
     except pipeline.CheckError as e:  # the recorder stays open for another try
         st.error(t("not_heard") if str(e) == speech.NOT_HEARD else str(e))
         return
@@ -239,7 +248,7 @@ def answer(res, claim, n):
 
     if speech.available() and st.button(t("listen"), key=f"listen{n}", icon=":material/volume_up:"):
         try:
-            st.audio(speech.speak(speech.script(res)), format="audio/mp3", autoplay=True)
+            st.audio(speech.speak(speech.script(res), language=res["language"]), format="audio/mp3", autoplay=True)
         except pipeline.CheckError as e:
             st.error(str(e))
 
