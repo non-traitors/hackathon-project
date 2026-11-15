@@ -1,0 +1,292 @@
+# Language registry: one place for everything language-specific.
+#
+# DRAFT TRANSLATIONS. Every language except English is marked `reviewed: false`:
+# the wording below was drafted by Claude and has NOT been checked by a native
+# speaker. The UI shows a "beta" notice for unreviewed languages. Set
+# `reviewed: true` only after a native speaker has checked the language against
+# the rubric in readme.md (meaning, conditions kept, terminology, tone).
+#
+# Fields
+#   display      name shown in the language picker
+#   model_name   exact instruction given to Gemini for the answer language
+#   rtl          right-to-left script
+#   reviewed     see above
+#   verdicts     localized labels; the English label is always shown too
+#   ui           static interface strings ({office} is filled in by the app)
+#   glossary     fixed wording for key terms; acronyms stay in Latin letters
+#   keywords     claim words (in this language) that route to a topic; matched
+#                as substrings for non-Latin scripts and as whole words otherwise
+
+languages:
+  en:
+    display: English
+    model_name: English
+    rtl: false
+    reviewed: true
+    verdicts: {Supported: Supported, Contradicted: Contradicted, Unclear: Unclear,
+               In effect: In effect, Proposed only: Proposed only, Blocked: Blocked}
+    ui:
+      app_title: Is This Still True?
+      tagline: Check what you heard against official sources.
+      starters_label: Heard something? Start here.
+      paste_label: Or paste what you heard
+      placeholder: 'e.g. "Is OPT still available after graduation?"'
+      school_label: Your school
+      language_label: Answer language
+      check_button: Check it
+      privacy_note: Don't enter passport, I-94 or immigration document numbers. Nothing you type is saved.
+      progress: Reading official sources… (about 10 seconds)
+      we_checked: We checked
+      applies_to: Applies to
+      depends_on: It depends on
+      next_step: Next step
+      office_question: Question to send your school's office (in English)
+      sources: Sources
+      unclear_title: You don't have to figure it out alone.
+      unclear_body: Share this with your school's international student office before you make plans or pay a fee.
+      disclaimer: Not legal advice. Confirm with {office}.
+      beta: Beta translation. A native speaker has not reviewed it yet.
+      date_unknown: Date not shown
+      out_of_scope: This is outside what we can check. Please ask your school's international student office.
+      new_check: "← New check"
+    glossary: {}
+    keywords: {}
+
+  ar:
+    display: العربية
+    model_name: Arabic (Modern Standard Arabic)
+    rtl: true
+    reviewed: false
+    verdicts: {Supported: مدعوم بالمصادر, Contradicted: يتعارض مع المصادر, Unclear: غير واضح,
+               In effect: ساري المفعول, Proposed only: مقترح فقط, Blocked: موقوف}
+    ui:
+      app_title: هل هذا لا يزال صحيحًا؟
+      tagline: تحقّق مما سمعته من المصادر الرسمية.
+      starters_label: سمعت شيئًا؟ ابدأ من هنا.
+      paste_label: أو الصق ما سمعته
+      placeholder: 'مثال: "هل لا يزال OPT متاحًا بعد التخرج؟"'
+      school_label: جامعتك
+      language_label: لغة الإجابة
+      check_button: تحقّق
+      privacy_note: لا تدخل أرقام جواز السفر أو I-94 أو وثائق الهجرة. لا يتم حفظ ما تكتبه.
+      progress: نقرأ المصادر الرسمية… (حوالي 10 ثوانٍ)
+      we_checked: تحققنا من
+      applies_to: ينطبق على
+      depends_on: يعتمد على
+      next_step: الخطوة التالية
+      office_question: سؤال لإرساله إلى مكتب جامعتك (بالإنجليزية)
+      sources: المصادر
+      unclear_title: لست مضطرًا لمعرفة ذلك وحدك.
+      unclear_body: شارك هذا مع مكتب الطلاب الدوليين في جامعتك قبل أن تضع خططًا أو تدفع أي رسوم.
+      disclaimer: هذه ليست استشارة قانونية. تأكد من {office}.
+      beta: ترجمة تجريبية. لم يراجعها متحدث أصلي بعد.
+      date_unknown: التاريخ غير معروض
+      out_of_scope: هذا خارج ما يمكننا التحقق منه. يرجى سؤال مكتب الطلاب الدوليين في جامعتك.
+      new_check: "← تحقق جديد"
+    glossary:
+      OPT: التدريب العملي الاختياري (OPT)
+      STEM OPT: تمديد التدريب العملي لتخصصات STEM (STEM OPT)
+      CPT: التدريب العملي المنهجي (CPT)
+      DSO: المسؤول المعيّن في الجامعة لشؤون الطلاب الدوليين (DSO)
+      EAD: تصريح العمل (EAD)
+      SSN: رقم الضمان الاجتماعي (SSN)
+      I-20: وثيقة I-20 (شهادة أهلية الطالب)
+      Form 8843: نموذج الضرائب 8843
+      duration of status: مدة الإقامة بحسب الوضع (D/S)
+    keywords:
+      work: [عمل, وظيفة, ساعات, ساعة]
+      oncampus: [الحرم, داخل الحرم, ساعة, ساعات]
+      opt: [opt, التدريب العملي]
+      stem_opt: [stem, ستيم]
+      fees: [رسوم, تكلف, تكاليف, يكلف, سعر, دولار]
+      rules: [قاعدة, قانون, إلغاء, ينتهي, تغيير, حظر]
+      ssn: [الضمان الاجتماعي, ssn]
+      tax: [ضريب, ضرائب, irs]
+
+  zh:
+    display: 中文
+    model_name: Mandarin Chinese (Simplified characters)
+    rtl: false
+    reviewed: false
+    verdicts: {Supported: 有官方依据, Contradicted: 与官方信息不符, Unclear: 不明确,
+               In effect: 已生效, Proposed only: 仅为提案, Blocked: 已被阻止}
+    ui:
+      app_title: 这还是真的吗？
+      tagline: 用官方来源核实你听到的说法。
+      starters_label: 听到了什么？从这里开始。
+      paste_label: 或粘贴你听到的内容
+      placeholder: '例如：“毕业后还能申请OPT吗？”'
+      school_label: 你的学校
+      language_label: 回答语言
+      check_button: 核实
+      privacy_note: 请勿输入护照号、I-94或移民文件号码。你输入的内容不会被保存。
+      progress: 正在阅读官方来源……（约10秒）
+      we_checked: 我们核实的是
+      applies_to: 适用于
+      depends_on: 取决于
+      next_step: 下一步
+      office_question: 可发给学校国际学生办公室的问题（英文）
+      sources: 来源
+      unclear_title: 你不必独自弄清楚。
+      unclear_body: 在做计划或付款之前，请把这个问题发给学校的国际学生办公室。
+      disclaimer: 这不是法律建议。请向{office}确认。
+      beta: 测试版翻译，尚未经母语人士审核。
+      date_unknown: 未显示日期
+      out_of_scope: 这超出了我们能核实的范围。请咨询学校的国际学生办公室。
+      new_check: "← 重新核实"
+    glossary:
+      OPT: 选择性实习培训（OPT）
+      STEM OPT: STEM OPT延期（24个月）
+      CPT: 课程实习（CPT）
+      DSO: 学校指定官员（DSO）
+      EAD: 工作许可（EAD）
+      SSN: 社会安全号码（SSN）
+      I-20: I-20表格（学生资格证明）
+      Form 8843: 8843税表
+      duration of status: 按身份有效的停留期限（D/S）
+    keywords:
+      work: [工作, 打工, 兼职, 小时]
+      oncampus: [校内, 校园, 每周, 小时]
+      opt: [opt, 实习, 职业实践]
+      stem_opt: [stem, 理工科, 延期]
+      fees: [费用, 收费, 多少钱, 花费, 价格]
+      rules: [规定, 新规, 取消, 终止, 禁止, 政策, 变更]
+      ssn: [社保, 社会安全, ssn]
+      tax: [税, 报税, irs]
+
+  yue:
+    display: 粵語／繁體中文
+    model_name: "Cantonese as written in Hong Kong: Traditional Chinese characters in a plain written style that Cantonese speakers read easily"
+    rtl: false
+    reviewed: false
+    verdicts: {Supported: 有官方根據, Contradicted: 與官方資料不符, Unclear: 未能確定,
+               In effect: 已生效, Proposed only: 只係建議, Blocked: 已被阻止}
+    ui:
+      app_title: 呢個仲係真嘅嗎？
+      tagline: 用官方來源核實你聽到嘅說法。
+      starters_label: 聽到啲咩？由呢度開始。
+      paste_label: 或者貼上你聽到嘅內容
+      placeholder: '例如：「畢業後仲可以申請OPT嗎？」'
+      school_label: 你嘅學校
+      language_label: 回答語言
+      check_button: 核實
+      privacy_note: 請勿輸入護照號碼、I-94或移民文件號碼。你輸入嘅內容不會被儲存。
+      progress: 正在閱讀官方來源……（大約10秒）
+      we_checked: 我哋核實嘅係
+      applies_to: 適用於
+      depends_on: 視乎
+      next_step: 下一步
+      office_question: 可以send畀學校國際學生辦公室嘅問題（英文）
+      sources: 來源
+      unclear_title: 你唔需要自己一個人搞清楚。
+      unclear_body: 做決定或者付款之前，請將呢個問題send畀學校嘅國際學生辦公室。
+      disclaimer: 呢個唔係法律意見。請向{office}確認。
+      beta: 測試版翻譯，未經母語人士審核。
+      date_unknown: 未有顯示日期
+      out_of_scope: 呢個超出咗我哋可以核實嘅範圍。請向學校嘅國際學生辦公室查詢。
+      new_check: "← 重新核實"
+    glossary:
+      OPT: 選擇性實習培訓（OPT）
+      STEM OPT: STEM OPT延期（24個月）
+      CPT: 課程實習（CPT）
+      DSO: 學校指定官員（DSO）
+      EAD: 工作許可（EAD）
+      SSN: 社會安全號碼（SSN）
+      I-20: I-20表格（學生資格證明）
+      Form 8843: 8843稅表
+      duration of status: 按身份而定嘅逗留期限（D/S）
+    keywords:
+      work: [工作, 打工, 兼職, 小時]
+      oncampus: [校內, 校園, 每週, 小時]
+      opt: [opt, 實習, 職業實踐]
+      stem_opt: [stem, 理工, 延長]
+      fees: [費用, 收費, 幾多錢, 價錢]
+      rules: [規定, 新規, 取消, 終止, 禁止, 政策, 改變]
+      ssn: [社會安全, ssn]
+      tax: [稅, 報稅, irs]
+
+  ru:
+    display: Русский
+    model_name: Russian
+    rtl: false
+    reviewed: false
+    verdicts: {Supported: Подтверждается официальными источниками, Contradicted: Противоречит официальным источникам, Unclear: Неясно,
+               In effect: Действует, Proposed only: Только предложено, Blocked: Заблокировано}
+    ui:
+      app_title: Это всё ещё правда?
+      tagline: Проверьте услышанное по официальным источникам.
+      starters_label: Что-то услышали? Начните здесь.
+      paste_label: Или вставьте то, что услышали
+      placeholder: 'например: "Можно ли подать на OPT после выпуска?"'
+      school_label: Ваш университет
+      language_label: Язык ответа
+      check_button: Проверить
+      privacy_note: Не вводите номера паспорта, I-94 или иммиграционных документов. Всё, что вы вводите, не сохраняется.
+      progress: Читаем официальные источники… (около 10 секунд)
+      we_checked: Мы проверили
+      applies_to: Применимо к
+      depends_on: Зависит от
+      next_step: Следующий шаг
+      office_question: Вопрос для отправки в офис вашего университета (на английском)
+      sources: Источники
+      unclear_title: Вам не нужно разбираться в одиночку.
+      unclear_body: Отправьте это в офис международных студентов вашего университета, прежде чем строить планы или платить.
+      disclaimer: Это не юридическая консультация. Уточните в {office}.
+      beta: Тестовый перевод. Носитель языка ещё не проверил его.
+      date_unknown: Дата не указана
+      out_of_scope: Это выходит за рамки того, что мы можем проверить. Обратитесь в офис международных студентов вашего университета.
+      new_check: "← Новая проверка"
+    glossary:
+      OPT: Опциональная практическая подготовка (OPT)
+      STEM OPT: Продление OPT для STEM-специальностей (STEM OPT)
+      CPT: Курсовая практическая подготовка (CPT)
+      DSO: Назначенный сотрудник вуза по международным студентам (DSO)
+      EAD: Разрешение на работу (EAD)
+      SSN: Номер социального страхования (SSN)
+      I-20: Документ I-20 (подтверждение статуса студента)
+      Form 8843: Налоговая форма 8843
+      duration of status: Срок пребывания по статусу (D/S)
+    # Russian is inflected, so these are word stems matched as substrings.
+    keywords:
+      work: [работ, подработ]
+      oncampus: [кампус, часов, часа, часы]
+      opt: [opt, практическ]
+      stem_opt: [stem]
+      fees: [стоит, стоимост, цена, цены, платить, оплат, заплат, доллар]
+      rules: [правил, отмен, запрет, закончит, изменен, закон]
+      ssn: [ssn, соцстрах, социальн]
+      tax: [налог, irs]
+
+# One-tap example claims, shown as "heard something?" starters. These are test inputs,
+# not statements of fact. Draft translations (unreviewed) for every language but English.
+starters:
+  en:
+    - F-1 students can work 30 hours per week on campus.
+    - Every international student can get an SSN without a job.
+    - International students never need to file US tax forms.
+    - OPT now costs $70,000
+    - STEM OPT is ending
+  ar:
+    - يمكن لطلاب F-1 العمل 30 ساعة أسبوعيًا داخل الحرم الجامعي.
+    - يمكن لأي طالب دولي الحصول على رقم الضمان الاجتماعي (SSN) دون وظيفة.
+    - لا يحتاج الطلاب الدوليون إلى تقديم أي نماذج ضريبية أمريكية.
+    - أصبحت تكلفة OPT الآن 70,000 دولار
+    - برنامج STEM OPT سينتهي
+  zh:
+    - F-1学生每周可以在校内工作30小时。
+    - 每个国际学生都可以在没有工作的情况下申请SSN。
+    - 国际学生从不需要提交美国税表。
+    - OPT现在要花7万美元
+    - STEM OPT要取消了
+  yue:
+    - F-1學生每星期可以喺校內工作30小時。
+    - 每個國際學生冇工作都可以申請SSN。
+    - 國際學生從來唔使報美國稅表。
+    - OPT而家要70,000美元
+    - STEM OPT就嚟取消
+  ru:
+    - Студенты F-1 могут работать в кампусе 30 часов в неделю.
+    - Любой иностранный студент может получить SSN без работы.
+    - Иностранным студентам никогда не нужно подавать налоговые формы США.
+    - OPT теперь стоит 70 000 долларов
+    - STEM OPT отменяют

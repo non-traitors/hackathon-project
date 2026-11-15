@@ -22,6 +22,8 @@ DOCS = [
 def _out(verdict, sources):
     return _LLMOutput(
         verdict=verdict,
+        headline="",
+        claim_in_english="",
         rule_status="Not applicable",
         explanation="x",
         applies_to=[],
@@ -34,19 +36,19 @@ def _out(verdict, sources):
 
 
 def test_valid_citation_kept():
-    out = _out("Contradicted", [_LLMSource(url=DOCS[0]["url"], quote="up to 20 hours per week")])
+    out = _out("Contradicted", [_LLMSource(url=DOCS[0]["url"], quote="up to 20 hours per week", quote_translation="")])
     sources, verdict = validate_output(out, DOCS)
     assert verdict == "Contradicted" and len(sources) == 1 and sources[0].date is None
 
 
 def test_invented_url_dropped_and_verdict_downgraded():
-    out = _out("Supported", [_LLMSource(url="https://example.com/fake", quote="anything")])
+    out = _out("Supported", [_LLMSource(url="https://example.com/fake", quote="anything", quote_translation="")])
     sources, verdict = validate_output(out, DOCS)
     assert sources == [] and verdict == "Unclear"
 
 
 def test_fabricated_quote_dropped():
-    out = _out("Supported", [_LLMSource(url=DOCS[0]["url"], quote="30 hours per week")])
+    out = _out("Supported", [_LLMSource(url=DOCS[0]["url"], quote="30 hours per week", quote_translation="")])
     sources, verdict = validate_output(out, DOCS)
     assert sources == [] and verdict == "Unclear"
 
@@ -87,7 +89,7 @@ def test_missing_key_gives_friendly_error(monkeypatch):
 
 
 def test_rule_status_dropped_without_verified_citation(monkeypatch):
-    out = _out("Supported", [_LLMSource(url="https://example.com/fake", quote="x")])
+    out = _out("Supported", [_LLMSource(url="https://example.com/fake", quote="x", quote_translation="")])
     out.rule_status = "Blocked"
     monkeypatch.setattr(pipeline, "retrieve", lambda *a, **k: DOCS)
     monkeypatch.setattr(pipeline, "analyze", lambda *a, **k: out)
@@ -96,7 +98,7 @@ def test_rule_status_dropped_without_verified_citation(monkeypatch):
 
 
 def test_rule_status_kept_with_verified_citation(monkeypatch):
-    out = _out("Contradicted", [_LLMSource(url=DOCS[0]["url"], quote="up to 20 hours per week")])
+    out = _out("Contradicted", [_LLMSource(url=DOCS[0]["url"], quote="up to 20 hours per week", quote_translation="")])
     out.rule_status = "In effect"
     monkeypatch.setattr(pipeline, "retrieve", lambda *a, **k: DOCS)
     monkeypatch.setattr(pipeline, "analyze", lambda *a, **k: out)
@@ -166,7 +168,7 @@ def test_retrieve_skips_unreadable_pages_and_labels_scope(monkeypatch):
 
 
 def test_quote_must_come_from_fetched_text_not_model_memory():
-    out = _out("Supported", [_LLMSource(url=DOCS[0]["url"], quote="up to 20 hours per week")])
+    out = _out("Supported", [_LLMSource(url=DOCS[0]["url"], quote="up to 20 hours per week", quote_translation="")])
     sources, verdict = validate_output(out, [dict(DOCS[0], text="Totally different page text.")])
     assert sources == [] and verdict == "Unclear"
 
@@ -234,7 +236,7 @@ def test_unmatched_claim_falls_back_to_start_of_page_with_bigger_allowance():
 def test_quote_verified_against_full_text_not_the_trimmed_view():
     doc = dict(DOCS[0], text=LONG_PAGE, view="only a trimmed view")
     q = "not work more than 20 hours per week when school is in session"
-    out = _out("Contradicted", [_LLMSource(url=doc["url"], quote=q)])
+    out = _out("Contradicted", [_LLMSource(url=doc["url"], quote=q, quote_translation="")])
     sources, verdict = validate_output(out, [doc])
     assert len(sources) == 1 and verdict == "Contradicted"
 

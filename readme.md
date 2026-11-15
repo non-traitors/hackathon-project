@@ -10,7 +10,7 @@ Built by a team of international students for a 24-hour hackathon, for the **Fut
 
 [Repository](https://github.com/non-traitors/hackathon-project) · [Original project discussion](https://chatgpt.com/share/6af89ad7-5270-83ea-aeb2-fcc30b3aeecf)
 
-> **Project status:** Early implementation. The checking backend (`pipeline.py`), its source list (`sources.yaml`), and offline tests are in the repository. The Streamlit interface (`app.py`) still shows a placeholder result and is not yet connected to the backend. The backend has been run live against the Gemini API: the eight-case golden set in `tests/live_golden.py` passes (English and Arabic, MSU and UChicago), with checks taking about 8–15 seconds. The model is told today's date so it can say whether a rule has already taken effect. Fee questions such as "OPT now costs $70,000" correctly return **Unclear**, because the fee amounts are in USCIS tables that are not in the page text; the answer includes a ready-made English question for the school's office. Cantonese and Uzbek output has not been reviewed, the `low` thinking setting has not been re-verified, and deployment is still to be built.
+> **Project status:** Early implementation. The checking backend, source list, language registry and UI adapter are in the repository and have been run live against the Gemini API. The live tests pass: eight golden claims (English and Arabic, MSU and UChicago), a prompt-injection check, and a cross-language check in which Arabic, Mandarin, Cantonese and Russian each kept English's verdict and cited a page in common with it. An uncached check takes about 9 seconds on average and up to about 13 seconds (up to about 19 seconds in some non-English answers); repeat checks are instant. The main interface (`app.py`) still shows a placeholder result and is not yet connected to the backend; `app_prototype.py` is wired to it. All non-English text (interface strings, glossary, routing keywords, starter claims) is a draft that no native speaker has reviewed, so those languages are labeled beta. Fee questions such as "OPT now costs $70,000" correctly return **Unclear** because the fee amounts are in USCIS tables that are not in the page text. Deployment is still to be built.
 
 ## Why we are building this
 
@@ -71,11 +71,11 @@ The verdict labels will stay in English across languages. The explanation will u
 | --- | --- |
 | English | Clear explanations and consistent verdicts. |
 | Arabic — العربية | Translation accuracy and right-to-left layout. |
-| Mandarin Chinese — 中文 | Meaning, terminology, and readability. |
-| Traditional Chinese / Cantonese — 粵語／繁體中文 | Review script and language separately; Traditional Chinese script alone does not establish Cantonese quality. |
-| Uzbek — O'zbekcha | Translation accuracy and preservation of conditions and uncertainty. |
+| Mandarin Chinese (Simplified) — 中文 | Meaning, terminology, and readability. |
+| Cantonese (Traditional Chinese) — 粵語／繁體中文 | Review script and language separately; Traditional Chinese script alone does not establish Cantonese quality. |
+| Russian — Русский | Translation accuracy and preservation of conditions and uncertainty. |
 
-The team will validate each option before presenting it as supported. Uzbek and Cantonese output may need additional review or a narrower initial scope.
+The team will validate each option before presenting it as supported. Russian and Cantonese output may need additional review or a narrower initial scope.
 
 ### Stretch goals
 
@@ -122,7 +122,7 @@ The checker should:
 | Python | Application logic and API integration. |
 | Streamlit | Claim input, language selection, and results interface. |
 | Requests and pypdf | Fetch official pages and read their text (HTML and PDF). |
-| Gemini API (`google-genai`, Interactions API) | Evidence analysis and explanations in the selected language. Default model `gemini-4-hydrogen` at `medium` thinking, overridable with `GEMINI_MODEL` and `GEMINI_THINKING` (in a four-claim benchmark `low` took about 6 s against about 11 s for `medium`, but once lost the fee sources, so it needs re-verifying). Needs Python 3.10 or newer. |
+| Gemini API (`google-genai`, Interactions API) | Evidence analysis and explanations in the selected language. Default model `gemini-4-hydrogen` at `medium` thinking, overridable with `GEMINI_MODEL` and `GEMINI_THINKING`. In an eight-claim benchmark `low` thinking took about 6 s against about 9 s for `medium`, but cited fewer sources on three claims, so `medium` stays the default. Needs Python 3.10 or newer. |
 
 Deployment details will be documented when the application is deployed.
 
@@ -155,13 +155,16 @@ Current files:
 hackathon-project/
 ├── readme.md          # Project overview and implementation plan
 ├── app.py             # Streamlit interface (placeholder result, not yet connected)
-├── app_prototype.py   # Standalone interface wired to the backend
-├── pipeline.py        # Fetch official pages, call Gemini, verify citations
-├── sources.yaml       # Allowlist, topic keywords, curated source pages
+├── app_prototype.py   # Standalone interface wired to the backend, in five languages
+├── pipeline.py        # Fetch official pages, call Gemini, verify citations, cache
+├── languages.py       # Loads the language registry
+├── languages.yaml     # Languages: UI strings, glossary, routing keywords, starter claims (non-English drafts)
+├── ui_adapter.py      # Turns a result into plain data any frontend can draw
+├── sources.yaml       # Allowlist, topic keywords, curated source pages, out-of-scope topics
 ├── requirements.txt   # Python dependencies
 ├── .env.example       # Configuration template with no real keys (GEMINI_API_KEY, optional model and thinking level)
 ├── .gitignore         # Exclusions for secrets and local files
-└── tests/             # Offline checks (pytest) and live_golden.py, which needs a key and credits
+└── tests/             # Offline tests (pytest); live_golden, live_languages and live_sources need internet, and the first two need a key and credits
 ```
 
 ## Team workflow
@@ -197,7 +200,7 @@ Use the following as **test inputs, not statements of fact**. Expected verdicts 
 - "OPT now costs $70,000." (a fee rumor)
 - "STEM OPT is ending." (a rule-change rumor)
 
-`tests/live_golden.py` runs these against the real pages and the Gemini API, with acceptable verdicts fixed from the official page text rather than from the model. It needs a key and available credits.
+`tests/live_golden.py` runs these against the real pages and the Gemini API, with acceptable verdicts fixed from the official page text rather than from the model, plus a prompt-injection check. `tests/live_languages.py` asks the same claims in every language and requires the same verdict and a shared cited page. `tests/live_sources.py` checks that every curated page still loads (it needs internet but no key). The live tests need a key and available credits.
 
 For the demo, show the claim, search results, verdict, and explanation; switch languages; then show a case that returns **Unclear**. Explain which conditions or evidence affected the outcome.
 

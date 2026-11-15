@@ -13,7 +13,9 @@ from __future__ import annotations
 import io
 import os
 import re
+import threading
 import time
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from html.parser import HTMLParser
@@ -23,6 +25,8 @@ from urllib.parse import urlparse
 
 import yaml
 from pydantic import BaseModel, Field, ValidationError
+
+import languages as langs
 
 CONFIG_PATH = Path(__file__).parent / "sources.yaml"
 MAX_CLAIM_CHARS = 600
@@ -40,6 +44,8 @@ DEFAULT_MODEL = "gemini-4-hydrogen"
 # dropped the fee sources (before the passage-scoring fix), so "medium" is the safe default until
 # "low" is re-verified. Env GEMINI_THINKING overrides; empty string keeps the model default.
 DEFAULT_THINKING = "medium"
+RESULT_TTL = 6 * 3600  # in-memory only; claims are never written to disk
+MAX_UNCACHED_PER_MINUTE = 30  # simple guard on model spend; env CHECKS_PER_MINUTE overrides
 USER_AGENT = "Mozilla/5.0 (compatible; StudentClaimChecker/0.1)"
 
 Verdict = Literal["Supported", "Contradicted", "Unclear"]
@@ -54,12 +60,14 @@ class Source(BaseModel):
     url: str
     title: str = ""
     quote: str = ""
-    date: Optional[str] = None  # only set when the source provided one
+    quote_translation: str = ""  # the English quote in the answer language (non-English answers only)
+    date: Optional[str] = None  # last updated/published; only set when the page states one
     scope: Literal["federal", "school"] = "federal"
 
 
 class CheckResult(BaseModel):
     verdict: Verdict
+    headline: str = ""  # one-line answer in the answer language
     # Secondary tag for rule-change rumors; only set when the sources establish it.
     rule_status: RuleStatus = "Not applicable"
     explanation: str
@@ -69,6 +77,10 @@ class CheckResult(BaseModel):
     clarifying_question: Optional[str] = None
     next_step: str = ""
     question_for_office: str = ""  # always English: what to send the school's office
+    claim_in_english: str = ""  # how the claim was understood, so a mistranslation is visible
+    out_of_scope: bool = False  # answered without the model: outside what we can check
+    language: str = "en"  # registry code of the answer language
+    timing: dict = Field(default_factory=dict)  # diagnostics: stage seconds, cache hit, token usage
     checked_at: str = ""
     school: str = ""
 
@@ -77,18 +89,22 @@ class CheckResult(BaseModel):
 class _LLMSource(BaseModel):
     url: str
     quote: str
+    quote_translation: str  # empty when the answer language is English
 
 
 class _LLMOutput(BaseModel):
+    # Field order matters: verdict and headline come first so they could be streamed first.
     verdict: Verdict
+    headline: str
     rule_status: RuleStatus
     explanation: str
-    applies_to: list[str]
-    exceptions: list[str]
-    sources: list[_LLMSource]
+    applies_to: list[str] = Field(max_length=3)  # maxItems is enforced by the model API
+    exceptions: list[str] = Field(max_length=3)
+    sources: list[_LLMSource] = Field(max_length=3)
     clarifying_question: Optional[str]
     next_step: str
     question_for_office: str
+    claim_in_english: str
 
 
 # ---------------------------------------------------------------- configuration
@@ -111,15 +127,31 @@ def _norm(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip().lower()
 
 
+def _kw_matches(keyword, low: str) -> bool:
+    k = str(keyword).lower()
+    if not k.isascii():  # Arabic, Chinese...: no spaces between words, so substring
+        return k in low
+    # Latin script: whole words (a plural s is fine), so "intern" won't match "international"
+    return re.search(rf"(?<![a-z0-9]){re.escape(k)}s?(?![a-z0-9])", low) is not None
+
+
 def matched_topics(claim: str, config: Optional[dict] = None) -> list[str]:
-    """Topics whose keywords appear in the claim (empty if none do)."""
+    """Topics whose keywords (English or any registry language) appear in the claim."""
     config = config or load_config()
     low = claim.lower()
+    return [
+        t
+        for t, kws in config["topics"].items()
+        if any(_kw_matches(k, low) for k in list(kws) + langs.topic_keywords(t))
+    ]
 
-    def matches(k) -> bool:  # whole words (plural ok), so "intern" won't match "international"
-        return re.search(rf"(?<![a-z0-9]){re.escape(str(k).lower())}s?(?![a-z0-9])", low) is not None
 
-    return [t for t, kws in config["topics"].items() if any(matches(k) for k in kws)]
+def is_out_of_scope(claim: str, config: Optional[dict] = None) -> bool:
+    """True if the claim is only about something we have no sources for (e.g. banking)."""
+    config = config or load_config()
+    low = claim.lower()
+    outside = any(_kw_matches(k, low) for kws in config.get("out_of_scope", {}).values() for k in kws)
+    return outside and not matched_topics(claim, config)
 
 
 def select_seeds(claim: str, school_key: str, config: Optional[dict] = None) -> list[str]:
@@ -183,13 +215,32 @@ def _pdf_to_text(data: bytes) -> str:
     return re.sub(r"\s+", " ", " ".join((pg.extract_text() or "") for pg in reader.pages)).strip()
 
 
-_cache: dict[str, tuple[float, Optional[dict]]] = {}
+_cache: dict[str, tuple[float, Optional[dict], int]] = {}
+FAILURE_TTL = 60  # a page that failed to load is retried after a minute, not an hour
+
+_META_DATE = re.compile(
+    r"<meta[^>]+(?:property|name)=[\"'](?:article:modified_time|og:updated_time|dcterms\.modified|article:published_time)[\"'][^>]*content=[\"']([^\"']+)[\"']",
+    re.I,
+)
+_TEXT_DATE = re.compile(
+    r"(?:Last\s+(?:Reviewed/)?Updated|Page\s+Last\s+Reviewed(?:/Updated)?)\s*:?\s*"
+    r"([A-Z][a-z]+\.?\s+\d{1,2},\s+\d{4}|\d{1,2}/\d{1,2}/\d{4})"
+)
+
+
+def extract_date(markup: str) -> Optional[str]:
+    """A last-updated date the page itself states, or None. Never guessed."""
+    m = _META_DATE.search(markup)
+    if m and re.match(r"\d{4}-\d{2}-\d{2}", m.group(1)):
+        return m.group(1)[:10]
+    m = _TEXT_DATE.search(markup)
+    return m.group(1) if m else None
 
 
 def _fetch_one(url: str, allowed: list[str]) -> Optional[dict]:
     """Fetch one page's text, or None if it can't be read. Results are cached."""
     hit = _cache.get(url)
-    if hit and time.time() - hit[0] < CACHE_TTL:
+    if hit and time.time() - hit[0] < hit[2]:
         return hit[1]
     doc = None
     try:
@@ -199,16 +250,31 @@ def _fetch_one(url: str, allowed: list[str]) -> Optional[dict]:
         # A redirect must not leave the allowlist.
         if r.status_code == 200 and _host_allowed(r.url, allowed) and len(r.content) <= MAX_PAGE_BYTES:
             ctype = r.headers.get("content-type", "").lower()
+            date = None
             if "pdf" in ctype or url.lower().endswith(".pdf"):
                 title, text = Path(urlparse(url).path).name, _pdf_to_text(r.content)
             else:
                 title, text = html_to_text(r.text)
+                date = extract_date(r.text) or extract_date(text)  # meta tag, else visible text
             if text:
-                doc = {"url": url, "title": title or url, "text": text[:PAGE_CHARS], "date": None}
+                doc = {"url": url, "title": title or url, "text": text[:PAGE_CHARS], "date": date}
     except Exception:
         doc = None  # unreadable pages are simply not used as evidence
-    _cache[url] = (time.time(), doc)
+    _cache[url] = (time.time(), doc, CACHE_TTL if doc else FAILURE_TTL)
     return doc
+
+
+def warm_pages(config: Optional[dict] = None) -> int:
+    """Fetch every seed page now so the first student's check isn't slowed by downloads."""
+    config = config or load_config()
+    jobs = []
+    for key, school in config["schools"].items():
+        allowed = config["federal"] + school["domains"]
+        urls = [u for lst in config["seeds"]["federal"].values() for u in lst]
+        urls += [u for lst in school.get("seeds", {}).values() for u in lst]
+        jobs += [(u, allowed) for u in dict.fromkeys(urls) if _host_allowed(u, allowed)]
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        return sum(1 for d in pool.map(lambda j: _fetch_one(*j), jobs) if d)
 
 
 _STOP = {
@@ -291,7 +357,7 @@ def retrieve(claim: str, school_key: str, config: Optional[dict] = None) -> list
     extra = set()
     for t in topics:
         for k in config["topics"][t]:
-            extra |= _tokens(str(k))
+            extra |= _tokens(str(k))  # English words only; other scripts don't tokenize here
     money = "fees" in topics
     per_doc = max(MIN_VIEW, VIEW_BUDGET // max(1, len(found)))
     docs = []
@@ -345,13 +411,24 @@ string.
 write one short question, in ENGLISH regardless of the answer language, that the \
 student can send to the school's international student office. Otherwise use an \
 empty string.
-- Write explanation, applies_to, exceptions, clarifying_question and next_step in \
-the requested language. Keep quotes and question_for_office in English. Keep the \
-explanation to 2-3 plain sentences.
+- Write headline, explanation, applies_to, exceptions, clarifying_question and \
+next_step in the requested language. Keep quotes and question_for_office in English. \
+Terms like OPT, STEM OPT, CPT, DSO, EAD, SSN and I-20 stay in Latin letters; use the \
+glossary wording, if one is given, the first time a term appears.
+- Be brief, because short answers are faster to read and to produce: headline is one \
+line (at most 12 words) that answers the claim directly; explanation is at most 2 \
+short sentences; applies_to, exceptions and sources have at most 3 items, each one \
+short; use one quote per source.
+- claim_in_english: restate the student's claim in one plain English sentence, so a \
+mistranslation is visible.
+- quote_translation: if the requested language is not English, translate each quote \
+into the requested language (short); if it is English, use an empty string.
 - Do not give legal advice."""
 
 
 def _build_user_prompt(claim: str, context: dict, school_name: str, docs: list[dict], language: str) -> str:
+    code = langs.resolve_language(language)
+    glossary = langs.glossary_block(code)
     ctx = ", ".join(f"{k}: {v}" for k, v in context.items() if v) or "none given"
     blocks = "\n\n".join(
         f"[Document {i + 1}]\nURL: {d['url']}\nTitle: {d['title']}\n"
@@ -362,7 +439,9 @@ def _build_user_prompt(claim: str, context: dict, school_name: str, docs: list[d
     today = datetime.now(timezone.utc).date().isoformat()
     return (
         f"Today's date: {today}\nClaim: {claim}\nSchool: {school_name}\nStudent context: {ctx}\n"
-        f"Answer language: {language}\n\n{blocks}"
+        f"Answer language: {langs.model_language(language)}\n"
+        + (f"Glossary for the answer language:\n{glossary}\n" if glossary else "")
+        + f"\n{blocks}"
     )
 
 
@@ -392,7 +471,7 @@ def _generation_config() -> dict:
     return cfg
 
 
-def analyze(claim: str, context: dict, school_key: str, docs: list[dict], language: str, config: Optional[dict] = None) -> _LLMOutput:
+def analyze(claim: str, context: dict, school_key: str, docs: list[dict], language: str, config: Optional[dict] = None, stats: Optional[dict] = None) -> _LLMOutput:
     config = config or load_config()
     key = _api_key()
     from google import genai
@@ -412,6 +491,12 @@ def analyze(claim: str, context: dict, school_key: str, docs: list[dict], langua
             },
         )
         text = interaction.output_text
+        usage = getattr(interaction, "usage", None)
+        if stats is not None and usage is not None:  # token counts, for speed diagnosis
+            try:
+                stats["usage"] = usage.model_dump(exclude_none=True)
+            except Exception:
+                stats["usage"] = str(usage)
     except Exception as e:  # network, auth, quota
         raise CheckError(_friendly_api_error(e)) from e
     if not text:  # e.g. the response was blocked
@@ -434,14 +519,38 @@ def validate_output(out: _LLMOutput, docs: list[dict]) -> "tuple[list[Source], V
         if not s.quote.strip() or _norm(s.quote) not in _norm(d["text"]):
             continue
         seen.add(s.url)
-        sources.append(Source(url=d["url"], title=d["title"], quote=s.quote.strip(), date=d["date"], scope=d["scope"]))
+        sources.append(
+            Source(url=d["url"], title=d["title"], quote=s.quote.strip(), quote_translation=s.quote_translation.strip(),
+                   date=d["date"], scope=d["scope"])
+        )
     verdict = out.verdict
     if verdict != "Unclear" and not sources:
         verdict = "Unclear"  # a confident verdict needs at least one verifiable citation
     return sources, verdict
 
 
-def check_claim(claim: str, school_key: str, context: Optional[dict] = None, language: str = "English") -> CheckResult:
+_result_cache: dict[tuple, tuple[float, "CheckResult"]] = {}
+_recent_checks: deque = deque()
+_guard = threading.Lock()
+
+
+def clear_result_cache() -> None:
+    _result_cache.clear()
+    _recent_checks.clear()
+
+
+def _rate_limit() -> None:
+    limit = int(os.environ.get("CHECKS_PER_MINUTE") or MAX_UNCACHED_PER_MINUTE)
+    now = time.time()
+    with _guard:
+        while _recent_checks and now - _recent_checks[0] > 60:
+            _recent_checks.popleft()
+        if len(_recent_checks) >= limit:
+            raise CheckError("Many students are checking right now. Please try again in a minute.")
+        _recent_checks.append(now)
+
+
+def check_claim(claim: str, school_key: str, context: Optional[dict] = None, language: str = "English", use_cache: bool = True) -> CheckResult:
     config = load_config()
     claim = (claim or "").strip()
     if not claim:
@@ -450,29 +559,59 @@ def check_claim(claim: str, school_key: str, context: Optional[dict] = None, lan
         raise CheckError(f"Please shorten the claim to {MAX_CLAIM_CHARS} characters or fewer.")
     if school_key not in config["schools"]:
         raise CheckError("Please choose a supported school.")
-    _api_key()  # fail fast, before any network work
 
+    code = langs.resolve_language(language)
     school = config["schools"][school_key]
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+    if is_out_of_scope(claim, config):  # no model call, so it is instant and free
+        return CheckResult(
+            verdict="Unclear",
+            headline=langs.ui_text(code, "out_of_scope"),
+            explanation=langs.ui_text(code, "out_of_scope"),
+            out_of_scope=True,
+            language=code,
+            checked_at=now,
+            school=school["name"],
+            timing={"total_s": 0.0},
+        )
+
+    key = (_norm(claim), school_key, code, tuple(sorted((k, str(v)) for k, v in (context or {}).items() if v)))
+    hit = _result_cache.get(key)
+    if use_cache and hit and time.time() - hit[0] < RESULT_TTL:
+        cached = hit[1].model_copy(deep=True)
+        cached.timing = {"cached": True, "total_s": 0.0}
+        return cached
+
+    _api_key()  # fail fast, before any network work
+    _rate_limit()
+    t0 = time.time()
     docs = retrieve(claim, school_key, config)
+    t_retrieve = time.time() - t0
     if not docs:
         return CheckResult(
             verdict="Unclear",
             explanation="We couldn't read the official sources for this claim right now.",
             next_step=f"Ask the {school['office']} directly.",
+            language=code,
             checked_at=now,
             school=school["name"],
+            timing={"retrieve_s": round(t_retrieve, 2)},
         )
 
-    out = analyze(claim, context or {}, school_key, docs, language, config)
+    stats: dict = {}
+    t1 = time.time()
+    out = analyze(claim, context or {}, school_key, docs, language, config, stats)
+    t_analyze = time.time() - t1
     sources, verdict = validate_output(out, docs)
     explanation = out.explanation
     if verdict != out.verdict:
         explanation = "We couldn't verify a citation for this answer, so we can't confirm it. " + explanation
     # A rule status is a factual claim about a rule; require a verified citation.
     rule_status = out.rule_status if sources else "Not applicable"
-    return CheckResult(
+    result = CheckResult(
         verdict=verdict,
+        headline=out.headline,
         rule_status=rule_status,
         explanation=explanation,
         applies_to=out.applies_to,
@@ -481,6 +620,18 @@ def check_claim(claim: str, school_key: str, context: Optional[dict] = None, lan
         clarifying_question=out.clarifying_question,
         next_step=out.next_step,
         question_for_office=out.question_for_office,
+        claim_in_english=out.claim_in_english,
+        language=code,
         checked_at=now,
         school=school["name"],
+        timing={
+            "retrieve_s": round(t_retrieve, 2),
+            "analyze_s": round(t_analyze, 2),
+            "total_s": round(time.time() - t0, 2),
+            "pages": len(docs),
+            "prompt_chars": sum(len(d.get("view", d["text"])) for d in docs),
+            **stats,
+        },
     )
+    _result_cache[key] = (time.time(), result)
+    return result
