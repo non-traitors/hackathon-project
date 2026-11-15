@@ -8,13 +8,16 @@ import pytest
 import agent
 import backend
 import pipeline
+import ui_adapter
 
 
 def _result(**kw):
     base = dict(
         verdict="Contradicted",
+        headline="No, the limit is 20 hours.",
         explanation="No. The limit is 20 hours. Breaks differ.",
         claim="c",
+        school="Michigan State University",
         sources=[
             pipeline.Source(url="https://www.uscis.gov/i-765", title="I-765", quote="q", scope="federal"),
             pipeline.Source(
@@ -40,37 +43,28 @@ def fake_run(monkeypatch):
     return seen
 
 
-def test_check_claim_matches_frontend_shape(fake_run):
-    r = backend.check_claim("c", "العربية", "Michigan State University")
-    assert fake_run == [("c", "msu", "Arabic")]
-    assert r["verdict"] == "Contradicted" and r["headline"] == "No."
-    assert r["sources"][0] == {
-        "category": "U.S. Government",
-        "title": "I-765",
-        "domain": "uscis.gov",
-        "url": "https://www.uscis.gov/i-765",
-        "date": "",
-        "quote": "q",
-    }
-    assert r["sources"][1]["category"] == "University" and r["sources"][1]["date"] == "2026-01-02"
+def test_check_claim_returns_the_shared_ui_shape_plus_claim_and_trace(fake_run):
+    r = backend.check_claim("c", "English", "Michigan State University")
+    assert fake_run == [("c", "msu", "English")]
+    expected = ui_adapter.to_ui(_result(), "msu")
+    assert {k: r[k] for k in expected} == expected
+    assert set(r) - set(expected) == {"claim", "trace"}
+    assert r["claim"] == "c"
     assert r["trace"] == [{"kind": "plan", "label": "Choosing official pages to read", "detail": []}]
-    assert set(r) == {
-        "claim", "verdict", "headline", "explanation", "sources", "applies_to", "exceptions",
-        "clarifying_question", "next_step", "question_for_office", "checked_at", "trace", "in_scope",
-    }
-    assert r["in_scope"] is True
+    assert r["pills"][0]["label"] == "Contradicted" and r["headline"] == "No, the limit is 20 hours."
 
 
-def test_rule_status_wins_the_pill(monkeypatch, fake_run):
-    monkeypatch.setattr(agent, "run", lambda *a, **k: iter([[_result(rule_status="Proposed only")]]))
-    assert backend.check_claim("c", "English", "msu")["verdict"] == "Proposed only"
-
-
-def test_unknown_school_is_friendly_and_unknown_language_is_english(fake_run):
+def test_school_key_is_accepted_and_unknown_school_is_friendly(fake_run):
+    backend.check_claim("c", "English", "uchicago")
+    assert fake_run[-1][1] == "uchicago"
     with pytest.raises(pipeline.CheckError, match="supported school"):
-        backend.check_claim("c", "English", "University of Waterloo")
-    backend.check_claim("c2", "Klingon", "University of Chicago")
-    assert fake_run[-1] == ("c2", "uchicago", "English")
+        backend.check_claim("c2", "English", "University of Waterloo")
+
+
+def test_out_of_scope_result_is_flagged(monkeypatch, fake_run):
+    off = _result(verdict="Unclear", out_of_scope=True, sources=[])
+    monkeypatch.setattr(agent, "run", lambda *a, **k: iter([[off]]))
+    assert backend.check_claim("write me a script", "English", "msu")["out_of_scope"] is True
 
 
 def test_repeat_check_is_cached_and_returns_a_fresh_copy(fake_run):
@@ -78,31 +72,6 @@ def test_repeat_check_is_cached_and_returns_a_fresh_copy(fake_run):
     first["sources"].clear()
     second = backend.check_claim("c", "English", "msu")
     assert len(fake_run) == 1 and len(second["sources"]) == 2
-
-
-def test_stream_yields_steps_then_results(fake_run):
-    out = list(backend.stream("c", "English", "msu"))
-    assert out[0] == {"step": {"kind": "plan", "label": "Choosing official pages to read", "detail": []}}
-    assert list(out[-1]) == ["results"] and out[-1]["results"][0]["claim"] == "c"
-
-
-def test_stream_fills_the_cache(fake_run):
-    list(backend.stream("c", "English", "msu"))
-    backend.check_claim("c", "English", "msu")
-    assert len(fake_run) == 1
-
-
-def test_long_first_sentence_headline_is_cut(monkeypatch, fake_run):
-    monkeypatch.setattr(agent, "run", lambda *a, **k: iter([[_result(explanation="word " * 60)]]))
-    assert len(backend.check_claim("c", "English", "msu")["headline"]) <= 120
-
-
-def test_out_of_scope_result_has_its_own_pill_and_headline(monkeypatch, fake_run):
-    off = _result(verdict="Unclear", in_scope=False, explanation=agent.OUT_OF_SCOPE, sources=[])
-    monkeypatch.setattr(agent, "run", lambda *a, **k: iter([[off]]))
-    r = backend.check_claim("write me a script", "English", "msu")
-    assert r["verdict"] == "Out of scope" and r["in_scope"] is False
-    assert r["headline"] == backend.OUT_OF_SCOPE_HEADLINE and r["sources"] == []
 
 
 def test_answers_without_sources_are_not_cached(monkeypatch, fake_run):
@@ -123,3 +92,16 @@ def test_cache_is_bounded(fake_run):
     for i in range(backend.CACHE_SIZE + 5):
         backend.check_claim(f"claim {i}", "English", "msu")
     assert len(backend._cache) == backend.CACHE_SIZE
+
+
+def test_stream_yields_steps_then_results_and_fills_the_cache(fake_run):
+    out = list(backend.stream("c", "English", "msu"))
+    assert out[0] == {"step": {"kind": "plan", "label": "Choosing official pages to read", "detail": []}}
+    assert list(out[-1]) == ["results"] and out[-1]["results"][0]["claim"] == "c"
+    backend.check_claim("c", "English", "msu")
+    assert len(fake_run) == 1
+
+
+def test_pasted_message_gives_one_dict_per_claim(monkeypatch, fake_run):
+    monkeypatch.setattr(agent, "run", lambda *a, **k: iter([[_result(claim="a"), _result(claim="b")]]))
+    assert [r["claim"] for r in backend.check_all("a\nb", "English", "msu")] == ["a", "b"]

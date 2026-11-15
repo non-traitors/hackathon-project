@@ -52,8 +52,8 @@ def _trim(text: str) -> str:
 
 
 def script(result: dict) -> str:
-    """What to read for one result from backend.check_claim: the verdict, then the explanation."""
-    if not result.get("in_scope", True):
+    """What to read for one result dict from ui_adapter.to_ui: the verdict, then the explanation."""
+    if result.get("out_of_scope"):
         return result["explanation"]
     return f"{result['verdict']}. {result['explanation']}"
 

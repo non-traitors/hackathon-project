@@ -1,39 +1,26 @@
-"""Bridge between the Streamlit interface and the agent.
+"""Run the agent for a frontend.
 
-`check_claim(claim, language, school)` has the same name, argument order and
-result shape as the placeholder in app.py, so the interface can swap in the real
-backend with one import:
+`check_claim(claim, language, school)` has the same name and arguments as the
+function in app.py, and returns the same dict (built by ui_adapter.to_ui) with
+two extra keys: `claim`, the claim this result answers, and `trace`, the agent's
+steps. To put the agent behind the interface, app.py swaps its body for:
 
-    from backend import check_claim
+    return backend.check_claim(claim, language, school)
 
-`stream(...)` gives the same results plus the agent's steps as they happen, for a
-live progress display. Results are plain dicts, cached per (text, language,
-school) so a Streamlit rerun does not pay for the same check twice.
+`stream(...)` yields each step as it happens, then the results, for a live
+progress display. A pasted message can hold several claims; `check_all` returns
+one dict per claim.
 """
 from __future__ import annotations
 
 import copy
-import re
 import time
 from typing import Iterator
-from urllib.parse import urlparse
 
 import agent
 import pipeline
+import ui_adapter
 from pipeline import CheckError
-
-# Interface label -> the language name the model is asked to answer in.
-LANGUAGES = {
-    "English": "English",
-    "العربية": "Arabic",
-    "中文": "Mandarin Chinese",
-    "繁體中文": "Cantonese (Traditional Chinese)",
-    "Русский": "Russian",
-    "O'zbekcha": "Uzbek",
-}
-HEADLINE_CHARS = 120
-OUT_OF_SCOPE_VERDICT = "Out of scope"
-OUT_OF_SCOPE_HEADLINE = "That's outside what this checker covers."
 
 CACHE_SIZE = 64
 
@@ -47,6 +34,7 @@ def clear_cache() -> None:
 
 
 def _school_key(school: str) -> str:
+    """Accept a school key ("msu") or the name shown in the picker."""
     names = pipeline.schools()
     if school in names:
         return school
@@ -54,47 +42,6 @@ def _school_key(school: str) -> str:
         if name == school:
             return key
     raise CheckError("Please choose a supported school.")
-
-
-def _headline(explanation: str) -> str:
-    first = re.split(r"(?<=[.!?。！？؟])\s+", explanation.strip(), maxsplit=1)[0]
-    return first[:HEADLINE_CHARS].strip()
-
-
-def _source(s: pipeline.Source) -> dict:
-    host = (urlparse(s.url).hostname or "").lower()
-    return {
-        "category": "University" if s.scope == "school" else "U.S. Government",
-        "title": s.title or s.url,
-        "domain": host[4:] if host.startswith("www.") else host,
-        "url": s.url,
-        "date": s.date or "",
-        "quote": s.quote,
-    }
-
-
-def _to_dict(r: agent.AgentResult) -> dict:
-    if not r.in_scope:
-        verdict, headline = OUT_OF_SCOPE_VERDICT, OUT_OF_SCOPE_HEADLINE
-    else:
-        # One pill: the rule status for rule-change rumors, otherwise the verdict.
-        verdict = r.rule_status if r.rule_status != "Not applicable" else r.verdict
-        headline = _headline(r.explanation)
-    return {
-        "claim": r.claim,
-        "in_scope": r.in_scope,
-        "verdict": verdict,
-        "headline": headline,
-        "explanation": r.explanation,
-        "sources": [_source(s) for s in r.sources],
-        "applies_to": list(r.applies_to),
-        "exceptions": list(r.exceptions),
-        "clarifying_question": r.clarifying_question or "",
-        "next_step": r.next_step,
-        "question_for_office": r.question_for_office,
-        "checked_at": r.checked_at,
-        "trace": [s.model_dump() for s in r.trace],
-    }
 
 
 def stream(text: str, language: str, school: str) -> Iterator[dict]:
@@ -105,16 +52,20 @@ def stream(text: str, language: str, school: str) -> Iterator[dict]:
         yield {"results": copy.deepcopy(hit[1])}
         return
     school_key = _school_key(school)
-    for item in agent.run(key[0], school_key, None, LANGUAGES.get(language, "English")):
+    config = pipeline.load_config()
+    for item in agent.run(key[0], school_key, None, language):
         if isinstance(item, agent.Step):
             yield {"step": item.model_dump()}
-        else:
-            results = [_to_dict(r) for r in item]
-            if all(r["sources"] for r in results):
-                if len(_cache) >= CACHE_SIZE:
-                    _cache.pop(next(iter(_cache)))
-                _cache[key] = (time.time(), copy.deepcopy(results))
-            yield {"results": results}
+            continue
+        results = [
+            dict(ui_adapter.to_ui(r, school_key, config), claim=r.claim, trace=[s.model_dump() for s in r.trace])
+            for r in item
+        ]
+        if all(r["sources"] for r in results):
+            if len(_cache) >= CACHE_SIZE:
+                _cache.pop(next(iter(_cache)))
+            _cache[key] = (time.time(), copy.deepcopy(results))
+        yield {"results": results}
 
 
 def check_all(text: str, language: str, school: str) -> list[dict]:
@@ -126,8 +77,5 @@ def check_all(text: str, language: str, school: str) -> list[dict]:
 
 
 def check_claim(claim: str, language: str, school: str) -> dict:
-    """The first (usually only) result, in the shape app.py's placeholder returns."""
-    results = check_all(claim, language, school)
-    if not results:
-        raise CheckError("We couldn't produce a reliable answer. Please try again.")
-    return results[0]
+    """The first (usually only) result, in the shape app.py draws."""
+    return check_all(claim, language, school)[0]

@@ -10,7 +10,7 @@ Built by a team of international students for a 24-hour hackathon, for the **Fut
 
 [Repository](https://github.com/non-traitors/hackathon-project) · [Original project discussion](https://chatgpt.com/share/6af89ad7-5270-83ea-aeb2-fcc30b3aeecf)
 
-> **Project status:** Early implementation. The checking backend (`pipeline.py`), its source list (`sources.yaml`), and offline tests are in the repository. The Streamlit interface (`app.py`) still shows a placeholder result and is not yet connected to the backend. The backend has been run live against the Gemini API: the eight-case golden set in `tests/live_golden.py` passes (English and Arabic, MSU and UChicago), with checks taking about 8–15 seconds. The model is told today's date so it can say whether a rule has already taken effect. Fee questions such as "OPT now costs $70,000" correctly return **Unclear**, because the fee amounts are in USCIS tables that are not in the page text; the answer includes a ready-made English question for the school's office. Cantonese and Uzbek output has not been reviewed, the `low` thinking setting has not been re-verified, and deployment is still to be built.
+> **Project status:** Early implementation. The checking backend, source list, language registry and UI adapter are in the repository and have been run live against the Gemini API. The live tests pass: eight golden claims (English and Arabic, MSU and UChicago), a prompt-injection check, and a cross-language check in which Arabic, Mandarin, Cantonese and Russian each kept English's verdict and cited a page in common with it. An uncached check takes about 9 seconds on average and up to about 13 seconds (up to about 19 seconds in some non-English answers); repeat checks are instant. The main interface (`app.py`, Dark28A's layout) is connected to the backend and was click-tested live in English, Arabic, Russian and 繁體中文, including a firm answer, the "Unclear" flow with the English question for the school's office, and an out-of-scope claim; `app_prototype.py` is an alternate wired interface with extra optional context fields. All non-English text (interface strings, glossary, routing keywords, starter claims) is a draft that no native speaker has reviewed, so those languages are labeled beta. Fee questions such as "OPT now costs $70,000" correctly return **Unclear** because the fee amounts are in USCIS tables that are not in the page text. Deployment is still to be built.
 
 ## Why we are building this
 
@@ -68,9 +68,9 @@ For each claim the agent works in visible steps:
 
 What the agent may decide is what to read. What it may not decide is the answer without a verified quote of at least four words. The limits are fixed in code: 8 pages and 4 model calls per claim, and the model can only open URLs it was shown. The 45 second budget is soft: it is checked before each judging call, so a slow call can run past it. If a step after planning fails, the claim is handed to the single-pass check in `pipeline.py`, which adds one model call and reads up to 12 curated pages; the trace says so and names the error. If that check fails too, the claim comes back **Unclear** with the reason, and the other claims in the message keep their results.
 
-`backend.py` exposes this to the interface as `check_claim(claim, language, school)`, in the same shape as the placeholder in `app.py`, and as `stream(...)`, which also yields each step for a live progress display.
+`backend.py` exposes this to the interface as `check_claim(claim, language, school)`, with the same arguments and the same result dict (built by `ui_adapter.to_ui`) as the function in `app.py`, plus the claim and the agent's steps. `stream(...)` also yields each step for a live progress display. **`app.py` still calls the single-pass check**; switching it to the agent is a one-line change, left until the agent has passed a live run.
 
-**Staying on topic.** The planning step also decides whether the input is about being an international student in the United States. If it is not, the agent stops before reading any page and returns a fixed reply written in code, which the model cannot change. If the planning call itself fails, scope is unknown, so the agent fails closed: it reads nothing, skips the single-pass check, and asks the student to try again. This gate is one layer of several: every prompt treats the claim, the pasted message and page text as untrusted, the model can only open URLs it was shown, and a verdict still needs a verified quote. The interface shows these results with an **Out of scope** label.
+**Staying on topic.** Scope is checked twice before anything is read: first by the keyword check the single-pass check already uses (no model call), then by the planning step, which decides whether the input is about being an international student in the United States. If it is not, the agent stops and returns the fixed out-of-scope text from the language registry, which the model cannot change. If the planning call itself fails, scope is unknown, so the agent fails closed: it reads nothing, skips the single-pass check, and asks the student to try again. This gate is one layer of several: every prompt treats the claim, the pasted message and page text as untrusted, the model can only open URLs it was shown, and a verdict still needs a verified quote.
 
 ### Voice in and voice out
 
@@ -102,11 +102,11 @@ In Streamlit this is `st.audio_input` for the recording and `st.audio` for playb
 | --- | --- |
 | English | Clear explanations and consistent verdicts. |
 | Arabic — العربية | Translation accuracy and right-to-left layout. |
-| Mandarin Chinese — 中文 | Meaning, terminology, and readability. |
-| Traditional Chinese / Cantonese — 粵語／繁體中文 | Review script and language separately; Traditional Chinese script alone does not establish Cantonese quality. |
-| Uzbek — O'zbekcha | Translation accuracy and preservation of conditions and uncertainty. |
+| Mandarin Chinese (Simplified) — 中文 | Meaning, terminology, and readability. |
+| Cantonese (Traditional Chinese) — 繁體中文 | Review script and language separately; Traditional Chinese script alone does not establish Cantonese quality. |
+| Russian — Русский | Translation accuracy and preservation of conditions and uncertainty. |
 
-The team will validate each option before presenting it as supported. Uzbek and Cantonese output may need additional review or a narrower initial scope.
+The team will validate each option before presenting it as supported. Russian and Cantonese output may need additional review or a narrower initial scope.
 
 ### Stretch goals
 
@@ -153,7 +153,7 @@ The checker should:
 | Python | Application logic and API integration. |
 | Streamlit | Claim input, language selection, and results interface. |
 | Requests and pypdf | Fetch official pages and read their text (HTML and PDF). |
-| Gemini API (`google-genai`, Interactions API) | Evidence analysis and explanations in the selected language. Default model `gemini-4-hydrogen` at `medium` thinking, overridable with `GEMINI_MODEL` and `GEMINI_THINKING` (in a four-claim benchmark `low` took about 6 s against about 11 s for `medium`, but once lost the fee sources, so it needs re-verifying). Needs Python 3.10 or newer. |
+| Gemini API (`google-genai`, Interactions API) | Evidence analysis and explanations in the selected language. Default model `gemini-4-hydrogen` at `medium` thinking, overridable with `GEMINI_MODEL` and `GEMINI_THINKING`. In an eight-claim benchmark `low` thinking took about 6 s against about 9 s for `medium`, but cited fewer sources on three claims, so `medium` stays the default. Needs Python 3.10 or newer. |
 
 Deployment details will be documented when the application is deployed.
 
@@ -174,9 +174,9 @@ python3.13 -m venv .venv313   # any Python 3.10+
 .venv313/bin/python -m pytest
 ```
 
-To run the checker against the Gemini API you need a Gemini API key. Copy `.env.example` to `.env` and set `GEMINI_API_KEY`; keep real keys in `.env`, local environment variables, or the deployment platform's secret store, never in version control. `app.py` does not call the backend yet; `app_prototype.py` is a standalone interface that does (`.venv313/bin/streamlit run app_prototype.py`); the pipeline it calls has been tested live, but that interface has not been clicked through with a live key.
+To run the checker against the Gemini API you need a Gemini API key. Copy `.env.example` to `.env` and set `GEMINI_API_KEY`; keep real keys in `.env`, local environment variables, or the deployment platform's secret store, never in version control. Then start the app with `.venv313/bin/streamlit run app.py`. It reads the key from `.env` (or Streamlit secrets on a deployment).
 
-The backend milestone is reached: English and Arabic claims were checked end to end with a live key. The next milestone is connecting the main interface (`app.py`); when that is done, update this section with the verified launch command.
+The first milestone is reached: claims are checked end to end through the real interface with a live key, in all five languages' pipeline paths. Still to do: native-speaker review of the non-English text, deployment, and a faster first answer (see Limitations).
 
 ### Proposed file layout
 
@@ -185,17 +185,20 @@ Current files:
 ```text
 hackathon-project/
 ├── readme.md          # Project overview and implementation plan
-├── app.py             # Streamlit interface (placeholder result, not yet connected)
-├── app_prototype.py   # Standalone interface wired to the backend
-├── pipeline.py        # Fetch official pages, call Gemini, verify citations (single-pass check)
+├── app.py             # Streamlit interface (Dark28A's design), wired to the backend
+├── app_prototype.py   # Alternate wired interface with optional context fields
+├── pipeline.py        # Fetch official pages, call Gemini, verify citations, cache (single-pass check)
 ├── agent.py           # Bounded agent: plans what to read, follows official links, verifies quotes
-├── backend.py         # Bridge for app.py: check_claim(claim, language, school) and a live step stream
+├── backend.py         # Runs the agent for a frontend: results via ui_adapter plus a live step stream
 ├── speech.py          # Voice in (speech to text) and voice out (text to speech) with ElevenLabs
-├── sources.yaml       # Allowlist, topic keywords, curated source pages
+├── languages.py       # Loads the language registry
+├── languages.yaml     # Languages: UI strings, glossary, routing keywords, starter claims (non-English drafts)
+├── ui_adapter.py      # Turns a result into plain data any frontend can draw
+├── sources.yaml       # Allowlist, topic keywords, curated source pages, out-of-scope topics
 ├── requirements.txt   # Python dependencies
 ├── .env.example       # Configuration template with no real keys (GEMINI_API_KEY, optional model and thinking level)
 ├── .gitignore         # Exclusions for secrets and local files
-└── tests/             # Offline checks (pytest) and live_golden.py, which needs a key and credits
+└── tests/             # Offline tests (pytest); live_golden, live_languages and live_sources need internet, and the first two need a key and credits
 ```
 
 ## Team workflow
@@ -231,7 +234,7 @@ Use the following as **test inputs, not statements of fact**. Expected verdicts 
 - "OPT now costs $70,000." (a fee rumor)
 - "STEM OPT is ending." (a rule-change rumor)
 
-`tests/live_golden.py` runs these against the real pages and the Gemini API, with acceptable verdicts fixed from the official page text rather than from the model. It needs a key and available credits.
+`tests/live_golden.py` runs these against the real pages and the Gemini API, with acceptable verdicts fixed from the official page text rather than from the model, plus a prompt-injection check. `tests/live_languages.py` asks the same claims in every language and requires the same verdict and a shared cited page. `tests/live_sources.py` checks that every curated page still loads (it needs internet but no key). The live tests need a key and available credits.
 
 For the demo, show the claim, search results, verdict, and explanation; switch languages; then show a case that returns **Unclear**. Explain which conditions or evidence affected the outcome.
 
@@ -249,6 +252,8 @@ Before calling the MVP ready, verify that:
 ## Limitations and responsible use
 
 This is a hackathon prototype. Verdicts and translations can be wrong, official pages can be outdated, and the initial source list does not cover every university or topic. The tool is intended to help students find and understand evidence, not determine their eligibility or replace advice about their individual situation.
+
+Known limits today: a check that has not been asked before takes about 9 to 13 seconds (up to about 19 seconds in some non-English answers), while repeat checks are instant; only MSU and the University of Chicago are covered; banking and other topics outside the curated sources get an "outside what we can check" answer; fee amounts that live in USCIS tables, not page text, cannot be confirmed; and all non-English wording is an unreviewed draft.
 
 The planned notice under each result is:
 

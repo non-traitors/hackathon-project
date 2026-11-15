@@ -96,12 +96,12 @@ def test_failures_are_friendly_and_not_cached(posts, reply):
 
 
 def test_script_reads_the_verdict_then_the_explanation():
-    r = {"in_scope": True, "verdict": "Contradicted", "explanation": "No. The limit is 20 hours."}
+    r = {"out_of_scope": False, "verdict": "Contradicted", "explanation": "No. The limit is 20 hours."}
     assert speech.script(r) == "Contradicted. No. The limit is 20 hours."
 
 
 def test_script_for_out_of_scope_is_just_the_reply():
-    r = {"in_scope": False, "verdict": "Out of scope", "explanation": "This checker only covers student questions."}
+    r = {"out_of_scope": True, "verdict": "Unclear", "explanation": "This checker only covers student questions."}
     assert speech.script(r) == "This checker only covers student questions."
 
 
