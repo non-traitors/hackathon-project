@@ -107,7 +107,7 @@ def test_script_for_out_of_scope_is_just_the_reply():
 
 # ------------------------------------------------------------- speech to text
 def test_defaults_cover_the_languages_the_app_offers():
-    """eleven_v3 is the text-to-speech model that includes Uzbek and Cantonese."""
+    """eleven_v3 is the text-to-speech model that includes Cantonese."""
     assert speech.DEFAULT_MODEL == "eleven_v3" and speech.STT_MODEL == "scribe_v3"
 
 

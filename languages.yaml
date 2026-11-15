@@ -37,7 +37,7 @@ languages:
       language_label: Answer language
       check_button: Check it
       privacy_note: Don't enter passport, I-94 or immigration document numbers. Nothing you type is saved.
-      progress: Reading official sources… (about 10 seconds)
+      progress: Reading official sources. This usually takes 10 to 25 seconds.
       we_checked: We checked
       applies_to: Applies to
       depends_on: It depends on
@@ -67,6 +67,11 @@ languages:
       listen: "Listen"
       speak_label: "Or ask out loud"
       you_asked: "You asked"
+      empty_claim: 'Type or paste what you heard first.'
+      try_again: 'Try again'
+      we_heard: 'We heard this. Fix anything that is wrong, then check it.'
+      new_tab: 'opens in a new tab'
+      checked_at: 'Checked {when}'
     glossary: {}
     keywords: {}
 
@@ -118,6 +123,11 @@ languages:
       listen: "استمع"
       speak_label: "أو اسأل بصوتك"
       you_asked: "سألت"
+      empty_claim: 'اكتب أو الصق ما سمعته أولاً.'
+      try_again: 'حاول مرة أخرى'
+      we_heard: 'هذا ما سمعناه. صحّح أي خطأ ثم اضغط للتحقق.'
+      new_tab: 'يفتح في علامة تبويب جديدة'
+      checked_at: 'تم التحقق في {when}'
     glossary:
       OPT: التدريب العملي الاختياري (OPT)
       STEM OPT: تمديد التدريب العملي لتخصصات STEM (STEM OPT)
@@ -186,6 +196,11 @@ languages:
       listen: "收听"
       speak_label: "或者用语音提问"
       you_asked: "你问的是"
+      empty_claim: '请先输入或粘贴你听到的内容。'
+      try_again: '重试'
+      we_heard: '这是我们听到的内容。请改正错误，然后开始核实。'
+      new_tab: '在新标签页中打开'
+      checked_at: '核实时间：{when}'
     glossary:
       OPT: 选择性实习培训（OPT）
       STEM OPT: STEM OPT延期（24个月）
@@ -254,6 +269,11 @@ languages:
       listen: "收聽"
       speak_label: "或者用語音提問"
       you_asked: "你問的是"
+      empty_claim: '請先輸入或貼上你聽到的內容。'
+      try_again: '再試一次'
+      we_heard: '這是我們聽到的內容。請改正錯誤，然後開始核實。'
+      new_tab: '在新分頁開啟'
+      checked_at: '核實時間：{when}'
     glossary:
       OPT: 選擇性實習培訓（OPT）
       STEM OPT: STEM OPT延期（24個月）
@@ -322,6 +342,11 @@ languages:
       listen: "Прослушать"
       speak_label: "Или спросите голосом"
       you_asked: "Вы спросили"
+      empty_claim: 'Сначала введите или вставьте то, что вы услышали.'
+      try_again: 'Повторить'
+      we_heard: 'Вот что мы услышали. Исправьте ошибки и нажмите «Проверить».'
+      new_tab: 'откроется в новой вкладке'
+      checked_at: 'Проверено: {when}'
     glossary:
       OPT: Опциональная практическая подготовка (OPT)
       STEM OPT: Продление OPT для STEM-специальностей (STEM OPT)

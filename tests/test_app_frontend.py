@@ -156,3 +156,113 @@ def test_agent_mode_errors_are_friendly(monkeypatch):
     at = AppTest.from_file(APP, default_timeout=30).run()
     at.button[0].click().run()
     assert not at.exception and any("usage limit" in e.value for e in at.error)
+
+
+# ----------------------------------------------- accessibility and feedback
+def test_home_has_a_page_heading_and_real_labels(app):
+    import languages as langs
+
+    assert "<h1" in _html(app)
+    assert app.text_area[0].label == langs.ui_text("en", "paste_label")
+    assert app.selectbox[0].label == langs.ui_text("en", "language_label")
+
+
+def test_answer_is_a_heading_announced_when_it_arrives(app):
+    app.button[0].click().run()
+    html = _html(app)
+    assert 'role="status"' in html and '<h1 class="answer">No: 20 hours during the semester.' in html
+
+
+def test_quote_is_marked_as_english_inside_any_language(app):
+    app.button[0].click().run()
+    assert '<div class="qwrap" lang="en">' in _html(app)
+
+
+def test_source_link_says_it_opens_a_new_tab(app):
+    import languages as langs
+
+    app.button[0].click().run()
+    assert langs.ui_text("en", "new_tab") in _html(app)
+
+
+def test_answer_carries_a_stone_in_the_verdict_color(app):
+    assert 'class="stone"' in _html(app)  # the mark on the home screen
+    app.button[0].click().run()
+    assert 'class="stone contradicted"' in _html(app)
+
+
+def test_answer_says_when_it_was_checked(monkeypatch, app):
+    monkeypatch.setattr(pipeline, "check_claim", lambda *a: _result(checked_at="2026-11-14T23:41:07+00:00"))
+    app.button[0].click().run()
+    assert "Checked 2026-11-14 23:41 UTC" in _html(app)
+
+
+def test_checking_nothing_asks_for_a_claim_instead_of_doing_nothing(app):
+    import languages as langs
+
+    _button(app, "Check it").click().run()
+    assert not app.exception and app.calls == []
+    assert any(langs.ui_text("en", "empty_claim") in w.value for w in app.warning)
+
+
+def test_error_offers_try_again_and_trying_again_checks_again(monkeypatch):
+    calls = []
+
+    def flaky(claim, school, context, lang):
+        calls.append(claim)
+        if len(calls) == 1:
+            raise pipeline.CheckError("The checking service has reached its usage limit. Please try again later.")
+        return _result()
+
+    monkeypatch.setattr(pipeline, "warm_pages", lambda *a, **k: 0)
+    monkeypatch.setattr(pipeline, "check_claim", flaky)
+    monkeypatch.setattr(speech, "available", lambda: False)
+    monkeypatch.delenv("USE_AGENT", raising=False)
+    at = AppTest.from_file(APP, default_timeout=30).run()
+    at.button[0].click().run()
+    assert any("usage limit" in e.value for e in at.error)
+    _button(at, "Try again").click().run()
+    assert not at.exception and len(calls) == 2 and "No: 20 hours during the semester." in _html(at)
+
+
+def test_spoken_question_is_shown_for_correction_before_any_check(monkeypatch):
+    import streamlit as st
+
+    import languages as langs
+
+    class Recording:
+        def getvalue(self):
+            return b"RIFFdata"
+
+    calls = []
+    monkeypatch.setattr(pipeline, "warm_pages", lambda *a, **k: 0)
+    monkeypatch.setattr(pipeline, "check_claim", lambda *a: calls.append(a) or _result())
+    monkeypatch.setattr(speech, "available", lambda: True)
+    monkeypatch.setattr(speech, "transcribe", lambda audio: "Is OPT cancelled")
+    monkeypatch.setattr(st, "audio_input", lambda *a, **k: Recording())
+    monkeypatch.delenv("USE_AGENT", raising=False)
+    at = AppTest.from_file(APP, default_timeout=30).run()
+    assert not at.exception and calls == []
+    assert at.text_area[0].value == "Is OPT cancelled"
+    assert langs.ui_text("en", "we_heard") in _html(at)
+    _button(at, "Check it").click().run()
+    assert [c[0] for c in calls] == ["Is OPT cancelled"]
+
+
+def test_unheard_recording_shows_the_message_and_keeps_the_home_screen(monkeypatch):
+    import streamlit as st
+
+    class Recording:
+        def getvalue(self):
+            return b"RIFFdata"
+
+    def unheard(audio):
+        raise pipeline.CheckError(speech.NOT_HEARD)
+
+    monkeypatch.setattr(pipeline, "warm_pages", lambda *a, **k: 0)
+    monkeypatch.setattr(speech, "available", lambda: True)
+    monkeypatch.setattr(speech, "transcribe", unheard)
+    monkeypatch.setattr(st, "audio_input", lambda *a, **k: Recording())
+    at = AppTest.from_file(APP, default_timeout=30).run()
+    assert not at.exception and any(speech.NOT_HEARD in e.value for e in at.error)
+    assert len(at.button) >= 6  # starters and Check it are still there

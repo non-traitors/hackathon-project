@@ -9,30 +9,20 @@ import backend
 import languages as langs
 import pipeline
 import speech
+import theme
 import ui_adapter
 
 load_dotenv()
 st.set_page_config(page_title="OPT Check", page_icon="🎓")
 
 # ---------- Settings (edit these) ----------
-NAVY, BLUE, GRAY = "#1B2F5B", "#0B1FA8", "#5B6B8C"
-SOFT, LINE = "#EEF1F8", "#C9D3EA"
-MARK = "#FFF1A8"  # highlighter: marks the sentence copied from the official page
+# Colors, type and the stone live in theme.py.
 CONFIG = pipeline.load_config()
 # Language names come from languages.yaml: English, العربية, 中文, 繁體中文, Русский
 LANGUAGES = list(langs.language_choices().values())
 # Schools, offices and office links come from sources.yaml (one source of truth).
 SCHOOLS = {s["name"]: {"key": key, "office": s["office"], "url": s["office_url"]}
            for key, s in CONFIG["schools"].items()}
-# pill kind -> (background, text color)
-PILLS = {
-    "supported": ("#E3F3EA", "#1A7F4B"),
-    "contradicted": ("#FBE4E2", "#B3261E"),
-    "unclear": (SOFT, GRAY),
-    "in_effect": ("#E3F3EA", "#1A7F4B"),
-    "proposed": ("#FDF1D6", "#9A6700"),
-    "blocked": ("#FBE4E2", "#B3261E"),
-}
 # USE_AGENT=1 switches from the single-pass check to the agent (agent.py): it shows
 # its steps while it works and answers every claim in a pasted message.
 USE_AGENT = os.environ.get("USE_AGENT") == "1"
@@ -58,36 +48,7 @@ def _warm():
 
 _load_key()
 _warm()
-
-# ---------- Styling ----------
-SANS = "'Noto Sans','Noto Sans Arabic','Noto Sans SC','Noto Sans TC',sans-serif"
-SERIF = "'Noto Serif','Noto Sans Arabic','Noto Sans SC','Noto Sans TC',serif"
-st.markdown(f"""<style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=Noto+Serif:wght@400;600&family=Noto+Sans+Arabic:wght@400;600;700&family=Noto+Sans+SC:wght@400;600;700&family=Noto+Sans+TC:wght@400;600;700&display=swap');
-html, body, [class*="css"] {{ font-family:{SANS}; color:{NAVY}; }}
-.block-container {{ max-width:480px; padding-top:1.5rem; }}
-#MainMenu, footer, header {{ visibility:hidden; }}
-.small {{ font-size:.8rem; color:{GRAY}; }}
-.title {{ font-size:2rem; font-weight:700; line-height:1.15; margin:.2rem 0; }}
-.answer {{ font-family:{SERIF}; font-size:1.7rem; font-weight:600; line-height:1.25; margin:.4rem 0 .6rem; }}
-.asked {{ color:{GRAY}; font-size:.9rem; margin-bottom:.6rem; }}
-.label {{ font-weight:600; margin:1.2rem 0 .5rem; }}
-.box {{ background:{SOFT}; border-radius:12px; padding:12px 16px; margin-top:.8rem; }}
-.pill {{ display:inline-block; padding:4px 12px; border-radius:999px; font-weight:600; margin:0 6px 6px 0; }}
-.card {{ border-top:1px solid {LINE}; padding:14px 0 6px; }}
-.card a {{ color:{BLUE}; text-decoration:none; font-weight:600; }}
-.card a:hover, .card a:focus-visible {{ text-decoration:underline; }}
-/* The verified sentence, marked like a highlighter on a printed page. Always left-to-right English. */
-.qwrap {{ direction:ltr; text-align:left; margin:0 0 8px; }}
-.quote {{ display:inline; font-family:{SERIF}; font-size:1.05rem; line-height:1.75; background:{MARK};
-          padding:.12em .3em; -webkit-box-decoration-break:clone; box-decoration-break:clone; }}
-.tr {{ font-size:.9rem; color:{GRAY}; margin-bottom:8px; }}
-.steps p {{ margin:.15rem 0; }}
-div.stButton > button {{ border-radius:10px; border:0; background:{SOFT}; color:{NAVY}; width:100%; }}
-div.stButton > button:focus-visible {{ outline:2px solid {BLUE}; outline-offset:2px; }}
-div.stButton > button[kind="primary"], div.stButton > button[data-testid="stBaseButton-primary"] {{
-  background:{BLUE}; color:white; font-weight:600; padding:.7rem 1rem; }}
-</style>""", unsafe_allow_html=True)
+st.markdown(f"<style>{theme.css()}</style>", unsafe_allow_html=True)
 
 # ---------- State ----------
 st.session_state.setdefault("screen", "home")
@@ -132,9 +93,10 @@ def disclaimer():
     return f'<p class="small" style="margin-top:1.5rem">{esc(t("disclaimer", office=office))}</p>'
 
 
-def pill_html(p):
-    bg, color = PILLS[p["kind"]]
-    return f'<span class="pill" style="background:{bg};color:{color}">{esc(p["text"])}</span>'
+def pill_html(p, mini=False):
+    bg, color = theme.PILLS[p["kind"]]
+    cls = "pill mini" if mini else "pill"
+    return f'<span class="{cls}" style="background:{bg};color:{color}">{esc(p["text"])}</span>'
 
 
 # ---------- Backend ----------
@@ -168,20 +130,47 @@ def answers(claim, language, school):
     """The answers for this claim, checked once and kept for reruns (e.g. pressing Listen)."""
     key = (claim, language, school)
     kept = st.session_state.get("answers")
-    if not kept or kept[0] != key:
-        st.session_state["answers"] = kept = (key, run_check(claim, language, school))
-    return kept[1]
+    if kept and kept[0] == key:
+        return kept[1]
+    # While it reads: the stone with the light turning inside it, and what is being checked.
+    waiting = st.empty()
+    waiting.markdown(f'<div class="stone-wait">{theme.stone("reading", 148)}'
+                     f'<div class="asked">“{esc(claim)}”</div></div>', unsafe_allow_html=True)
+    try:
+        results = run_check(claim, language, school)
+    finally:
+        waiting.empty()
+    st.session_state["answers"] = (key, results)
+    return results
+
+
+def listen_to_question():
+    """Voice in: put what the student said into the text box, for them to correct before checking."""
+    recording = st.audio_input(t("speak_label"))
+    if recording is None:
+        return
+    audio = recording.getvalue()
+    if hash(audio) == st.session_state.get("heard"):  # each recording is transcribed once
+        return
+    st.session_state["heard"] = hash(audio)
+    try:
+        with st.spinner(t("progress")):
+            st.session_state["draft"] = speech.transcribe(audio)[:MAX_CHARS]
+        st.session_state["heard_note"] = True
+    except pipeline.CheckError as e:
+        st.error(str(e))
 
 
 # ---------- Screens ----------
 def home():
     col1, col2 = st.columns([3, 2])
     st.session_state["language"] = col2.selectbox(
-        "Language", LANGUAGES, label_visibility="collapsed",
+        langs.ui_text(lang_code(), "language_label"), LANGUAGES, label_visibility="collapsed",
         index=LANGUAGES.index(st.session_state["language"]))
     direction_css()
-    col1.markdown(f'<div class="title">{esc(t("home_title"))}</div>', unsafe_allow_html=True)
-    st.markdown(f'<span style="color:{GRAY}">{esc(t("home_subtitle"))}</span>', unsafe_allow_html=True)
+    col1.markdown(f'<div class="stone-row">{theme.stone(None, 44)}'
+                  f'<h1 class="title">{esc(t("home_title"))}</h1></div>', unsafe_allow_html=True)
+    st.markdown(f'<span style="color:{theme.GRAY}">{esc(t("home_subtitle"))}</span>', unsafe_allow_html=True)
     schools = list(SCHOOLS)
     st.session_state["school"] = st.selectbox(
         t("school_label"), schools, index=schools.index(st.session_state["school"]))
@@ -193,23 +182,20 @@ def home():
             go("result", rumor)
 
     st.markdown(f'<div class="label">{esc(t("paste_label"))}</div>', unsafe_allow_html=True)
-    text = st.text_area("claim", placeholder=t("placeholder"), label_visibility="collapsed",
-                        max_chars=MAX_CHARS)
-    if st.button(t("check_button"), type="primary", use_container_width=True) and text.strip():
-        go("result", text.strip())
-    st.markdown(f'<p class="small">🔒 {esc(t("privacy_note"))}</p>', unsafe_allow_html=True)
-
-    if speech.available():
-        recording = st.audio_input(t("speak_label"))
-        if recording is not None:
-            audio = recording.getvalue()
-            if hash(audio) != st.session_state.get("heard"):  # each recording is transcribed once
-                st.session_state["heard"] = hash(audio)
-                try:
-                    with st.spinner(t("progress")):
-                        go("result", speech.transcribe(audio))
-                except pipeline.CheckError as e:
-                    st.error(str(e))
+    typed, spoken = st.container(), st.container()
+    with spoken:  # runs first so a transcript can fill the text box above it
+        if speech.available():
+            listen_to_question()
+    with typed:
+        if st.session_state.get("heard_note"):
+            st.markdown(f'<p class="small">{esc(t("we_heard"))}</p>', unsafe_allow_html=True)
+        text = st.text_area(t("paste_label"), key="draft", placeholder=t("placeholder"),
+                            label_visibility="collapsed", max_chars=MAX_CHARS)
+        if st.button(t("check_button"), type="primary", use_container_width=True):
+            if text.strip():
+                go("result", text.strip())
+            st.warning(t("empty_claim"))
+        st.markdown(f'<p class="small">🔒 {esc(t("privacy_note"))}</p>', unsafe_allow_html=True)
 
     st.markdown(f'<p class="small">{esc(t("sources_note"))}</p>' + disclaimer(), unsafe_allow_html=True)
 
@@ -217,20 +203,23 @@ def home():
 def source_html(s):
     """One official source: the copied sentence first, then where it comes from."""
     when = esc(s["date_text"]) if not s["date"] else f'{esc(t("last_updated"))}: {esc(s["date"])}'
-    card = f'<div class="card"><div class="qwrap"><div class="quote">{esc(s["quote"])}</div></div>'
+    card = f'<div class="card"><div class="qwrap" lang="en"><div class="quote">{esc(s["quote"])}</div></div>'
     if s["quote_translation"]:
         card += f'<div class="tr">{esc(s["quote_translation"])}</div>'
-    return (card + f'<a href="{html.escape(s["url"], quote=True)}" target="_blank" rel="noopener">{esc(s["title"])}</a>'
+    return (card + f'<a href="{html.escape(s["url"], quote=True)}" target="_blank" rel="noopener">{esc(s["title"])}'
+            f'<span class="sr"> ({esc(t("new_tab"))})</span></a>'
             f'<p class="small">{esc(s["category"])}<br>{esc(s["domain"])}<br>{when}</p></div>')
 
 
 def answer(res, claim, n):
     """Draw one answer: verdict and headline first, then the proof, then what to do next."""
-    parts = [f'<p>{"".join(pill_html(p) for p in res["pills"])}</p>'
-             f'<div class="answer">{esc(res["headline"])}</div>']
+    tag = "h1" if n == 0 else "h2"
+    head = (f'<div role="status" lang="{lang_code()}"><div class="stone-row">{theme.stone(res["pills"][0]["kind"], 44)}'
+            f'<div>{"".join(pill_html(p) for p in res["pills"])}</div></div>'
+            f'<{tag} class="answer">{esc(res["headline"])}</{tag}>')
     if res["explanation"] and res["explanation"] != res["headline"]:
-        parts.append(f'<p style="color:{GRAY}">{esc(res["explanation"])}</p>')
-    st.markdown("".join(parts), unsafe_allow_html=True)
+        head += f'<p style="color:{theme.GRAY}">{esc(res["explanation"])}</p>'
+    st.markdown(head + "</div>", unsafe_allow_html=True)
 
     if speech.available() and st.button(t("listen"), key=f"listen{n}", icon=":material/volume_up:"):
         try:
@@ -254,12 +243,15 @@ def answer(res, claim, n):
     parts.append(f'<p class="asked">{esc(t("you_asked"))}: “{esc(claim)}”</p>')
     if res["claim_in_english"] and lang_code() != "en":
         parts.append(f'<p class="small">{esc(t("we_checked"))}: “{esc(res["claim_in_english"])}”</p>')
+    if res.get("checked_at"):  # when the check ran, which is not when a page was last updated
+        when = f'{res["checked_at"][:10]} {res["checked_at"][11:16]} UTC'
+        parts.append(f'<p class="small">{esc(t("checked_at", when=when))}</p>')
     st.markdown("".join(parts), unsafe_allow_html=True)
 
     if res["show_ask_office"]:
         if not res["out_of_scope"]:
             st.markdown(f'<div class="box"><b>{esc(t("unclear_title"))}</b><br>'
-                        f'<span style="color:{GRAY}">{esc(t("unclear_body"))}</span></div>',
+                        f'<span style="color:{theme.GRAY}">{esc(t("unclear_body"))}</span></div>',
                         unsafe_allow_html=True)
         if res["question_for_office"]:  # always English: it is sent to the school's office
             st.markdown(f'**{t("office_question")}**')
@@ -270,18 +262,18 @@ def answer(res, claim, n):
 def result():
     direction_css()
     if st.button(t("new_check")):
-        st.session_state.pop("answers", None)
+        for key in ("answers", "draft", "heard_note"):
+            st.session_state.pop(key, None)
         go("home")
     claim = st.session_state["claim"]
-    waiting = st.empty()  # while the check runs, show what is being checked
-    waiting.markdown(f'<p class="asked">{esc(t("you_asked"))}: “{esc(claim)}”</p>', unsafe_allow_html=True)
     try:
         results = answers(claim, st.session_state["language"], st.session_state["school"])
     except pipeline.CheckError as e:  # empty claim, usage limit, service problem...
         st.error(str(e))
+        if st.button(t("try_again")):
+            st.rerun()
         st.markdown(disclaimer(), unsafe_allow_html=True)
         return
-    waiting.empty()
     beta_notice()
 
     for n, res in enumerate(results):
@@ -294,8 +286,8 @@ def result():
         rules = any(len(r["pills"]) > 1 for r in results)
         shown = legend["verdicts"] + (legend["rule_statuses"] if rules else [])
         note = f'<p class="small">{esc(t("legend_note"))}</p>' if rules else ""
-        st.markdown(f'<div class="label">{esc(t("legend_title"))}</div>'
-                    f'{"".join(pill_html(p) for p in shown)}{note}', unsafe_allow_html=True)
+        st.markdown(f'<details class="legend"><summary>{esc(t("legend_title"))}</summary>'
+                    f'{"".join(pill_html(p, mini=True) for p in shown)}{note}</details>', unsafe_allow_html=True)
     st.markdown(disclaimer(), unsafe_allow_html=True)
 
 
