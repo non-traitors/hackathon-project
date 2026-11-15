@@ -5,3 +5,6 @@ __pycache__/
 .Rhistory
 .DS_Store
 .venv313/
+.env.*
+!.env.example
+.streamlit/secrets.toml
