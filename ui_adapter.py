@@ -90,4 +90,5 @@ def to_ui(result: pipeline.CheckResult, school_key: str, config: Optional[dict] 
         "beta_text": langs.ui_text(code, "beta"),
         "language": code,
         "cached": bool(result.timing.get("cached")),
+        "checked_at": result.checked_at,  # ISO time the check ran (not when a page was updated)
     }

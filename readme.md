@@ -54,6 +54,37 @@ Verdict + explanation + source links
 
 The verdict labels will stay in English across languages. The explanation will use the selected language.
 
+### Agent mode
+
+`agent.py` adds a bounded agent on top of the single-pass check. It is implemented and covered by offline tests; **it has not been run against the live Gemini API yet**, so its accuracy and speed are unmeasured (`tests/live_golden.py` has the live cases, run with `-k agent`).
+
+For each claim the agent works in visible steps:
+
+1. **Split.** A pasted group-chat message becomes up to 3 separate claims. A short one-line claim skips this step.
+2. **Plan.** Gemini chooses which curated official pages to read (at most 4) and gives English search terms, so claims written in other languages still find the right passages.
+3. **Read.** The app fetches those pages and collects the links on them that stay inside the allowlist.
+4. **Judge.** Gemini either answers, or asks to read up to 2 more pages from the links and catalog it was shown. At most 2 such rounds.
+5. **Verify.** The same rule as before: every quote must appear word for word in a page the app fetched, or the verdict drops to **Unclear**.
+
+What the agent may decide is what to read. What it may not decide is the answer without a verified quote of at least four words. The limits are fixed in code: 8 pages and 4 model calls per claim, and the model can only open URLs it was shown. The 45 second budget is soft: it is checked before each judging call, so a slow call can run past it. If a step after planning fails, the claim is handed to the single-pass check in `pipeline.py`, which adds one model call and reads up to 12 curated pages; the trace says so and names the error. If that check fails too, the claim comes back **Unclear** with the reason, and the other claims in the message keep their results.
+
+`backend.py` exposes this to the interface as `check_claim(claim, language, school)`, with the same arguments and the same result dict (built by `ui_adapter.to_ui`) as the function in `app.py`, plus the claim and the agent's steps. `stream(...)` also yields each step for a live progress display. **`app.py` uses the single-pass check by default.** Start it with `USE_AGENT=1` to use the agent instead: the wait then shows the agent's steps, and a pasted message gets one answer per claim. The default stays single-pass until the agent has passed a live run.
+
+**Staying on topic.** Scope is checked twice before anything is read: first by the keyword check the single-pass check already uses (no model call), then by the planning step, which decides whether the input is about being an international student in the United States. If it is not, the agent stops and returns the fixed out-of-scope text from the language registry, which the model cannot change. If the planning call itself fails, scope is unknown, so the agent fails closed: it reads nothing, skips the single-pass check, and asks the student to try again. This gate is one layer of several: every prompt treats the claim, the pasted message and page text as untrusted, the model can only open URLs it was shown, and a verdict still needs a verified quote.
+
+### Voice in and voice out
+
+`speech.py` lets a student speak a question and listen to the answer, using ElevenLabs.
+
+- **Voice in.** `speech.transcribe(recording)` sends the recording to ElevenLabs speech to text (`scribe_v3`) and returns the text. The transcript then goes through the agent like anything typed, so the scope gate, the allowlist and the verified-quote rule all still apply.
+- **Voice out.** `speech.speak(speech.script(result))` returns MP3 audio of the verdict and explanation, using ElevenLabs text to speech (`eleven_v3`, which covers Cantonese as well as English, Arabic, Mandarin and Russian).
+
+In `app.py` this is a microphone under the text box on the home screen and a Listen button under each answer. Both calls need `ELEVENLABS_API_KEY`; without one, `speech.available()` is false and the interface should hide the voice controls. If ElevenLabs fails, the student sees a short message and can type instead; the written answer is never affected.
+
+**What is sent to ElevenLabs:** the answer text, and the student's recording only when they choose to speak. Typed questions are never sent there.
+
+**Verified live on 2026-11-14:** an English answer was turned into audio (about 2 seconds) and transcribed back correctly (under 1 second), and the Listen button played a real answer in the app. Arabic, Mandarin, Cantonese and Russian audio has not been listened to by a speaker of those languages.
+
 ## MVP scope
 
 - [ ] Claim input and answer-language selector.
@@ -156,7 +187,10 @@ hackathon-project/
 ├── readme.md          # Project overview and implementation plan
 ├── app.py             # Streamlit interface (Dark28A's design), wired to the backend
 ├── app_prototype.py   # Alternate wired interface with optional context fields
-├── pipeline.py        # Fetch official pages, call Gemini, verify citations, cache
+├── pipeline.py        # Fetch official pages, call Gemini, verify citations, cache (single-pass check)
+├── agent.py           # Bounded agent: plans what to read, follows official links, verifies quotes
+├── backend.py         # Runs the agent for a frontend: results via ui_adapter plus a live step stream
+├── speech.py          # Voice in (speech to text) and voice out (text to speech) with ElevenLabs
 ├── languages.py       # Loads the language registry
 ├── languages.yaml     # Languages: UI strings, glossary, routing keywords, starter claims (non-English drafts)
 ├── ui_adapter.py      # Turns a result into plain data any frontend can draw
@@ -226,3 +260,13 @@ The planned notice under each result is:
 > This is not legal advice. Confirm with your school's international student office before acting (the app names it).
 
 Students at other institutions should confirm with their own international student office. Users should enter the claim they want checked without including passport numbers, immigration document numbers, or other sensitive personal details.
+
+## AI tools used
+
+The hackathon rules ask teams to say which AI tools they used and how.
+
+- **Gemini API** is part of the product: it reads the fetched official pages and writes the explanation.
+- **ElevenLabs** is part of the product: it transcribes spoken questions and reads answers aloud (`speech.py`).
+- **Claude Code** was used to audit the repository and to write `agent.py`, `backend.py`, `speech.py` and their tests, from a design and plan the team reviewed (`docs/superpowers/`).
+- **ChatGPT** was used for the original project discussion linked at the top of this file.
+- _Team: add any other tools used for the pipeline, the interface or the design here before submitting._

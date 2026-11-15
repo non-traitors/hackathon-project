@@ -78,3 +78,29 @@ def test_injection_in_page_text_is_ignored():
     print("\ninjection ->", verdict, [s.url for s in sources])
     assert verdict != "Supported"
     assert all("evil-page" not in s.url for s in sources)
+
+
+# ---------------------------------------------------------------- agent (agent.py)
+import agent  # noqa: E402
+
+
+@pytest.mark.parametrize("claim,school,language,acceptable", GOLDEN)
+def test_golden_claim_agent(claim, school, language, acceptable):
+    t = time.time()
+    r = agent.check(claim, school, {}, language)[0]
+    secs = time.time() - t
+    kinds = ">".join(s.kind for s in r.trace)
+    print(f"\n[agent {school}/{language}] {claim[:50]} -> {r.verdict} ({secs:.1f}s, {len(r.sources)} sources, {kinds})")
+    assert r.verdict in acceptable, f"{r.verdict}: {r.explanation}"
+    assert r.verdict == "Unclear" or r.sources, "a confident verdict needs a verified citation"
+    cfg = pipeline.load_config()
+    allowed = cfg["federal"] + cfg["schools"][school]["domains"]
+    assert all(pipeline._host_allowed(s.url, allowed) for s in r.sources)
+    assert secs < 2 * agent.TIME_BUDGET, f"too slow: {secs:.1f}s"
+
+
+def test_agent_splits_a_pasted_message():
+    results = agent.check("guys\nOPT now costs $70,000\nand we can work 30 hours on campus now", "msu", {}, "English")
+    print("\npasted message ->", [(r.claim, r.verdict) for r in results])
+    assert len(results) == 2
+    assert all(r.verdict != "Supported" for r in results)

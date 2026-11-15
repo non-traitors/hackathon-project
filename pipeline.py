@@ -39,6 +39,7 @@ MAX_PAGE_BYTES = 15_000_000
 FETCH_TIMEOUT = 20
 REQUEST_TIMEOUT_MS = 60_000  # a hung Gemini request must fail, not wait for minutes
 CACHE_TTL = 3600  # seconds; official pages change slowly
+MIN_QUOTE_WORDS = 4  # a one- or two-word quote appears on any page and proves nothing
 DEFAULT_MODEL = "gemini-4-hydrogen"
 # Benchmarked on gemini-4-hydrogen (4 claims): default ~12 s, medium ~11 s, low ~6 s. "low" once
 # dropped the fee sources (before the passage-scoring fix), so "medium" is the safe default until
@@ -181,18 +182,23 @@ class _TextExtractor(HTMLParser):
         self.title = ""
         self._skip = 0
         self._in_title = False
+        self._title_done = False  # only the page's first <title>; inline icons repeat it
 
     def handle_starttag(self, tag, attrs):
         if tag in self._SKIP:
             self._skip += 1
         elif tag == "title":
-            self._in_title = True
+            if self._title_done or self._skip:
+                self._skip += 1  # a repeated title is neither the title nor page text
+            else:
+                self._in_title = True
 
     def handle_endtag(self, tag):
-        if tag in self._SKIP and self._skip:
-            self._skip -= 1
-        elif tag == "title":
+        if tag == "title" and self._in_title:
             self._in_title = False
+            self._title_done = True
+        elif (tag in self._SKIP or tag == "title") and self._skip:
+            self._skip -= 1
 
     def handle_data(self, data):
         if self._in_title:
@@ -471,24 +477,32 @@ def _generation_config() -> dict:
     return cfg
 
 
-def analyze(claim: str, context: dict, school_key: str, docs: list[dict], language: str, config: Optional[dict] = None, stats: Optional[dict] = None) -> _LLMOutput:
-    config = config or load_config()
+def _generate(
+    system: str, prompt: str, schema: dict, thinking: Optional[str] = None, stats: Optional[dict] = None
+) -> str:
+    """One structured-JSON Gemini call. Returns the JSON text; raises CheckError.
+
+    `thinking` overrides the configured thinking level for this call only.
+    `stats`, when given, receives the call's token usage.
+    """
     key = _api_key()
     from google import genai
 
-    school_name = config["schools"][school_key]["name"]
+    cfg = _generation_config()
+    if thinking:
+        cfg["thinking_level"] = thinking
     try:
-        client = genai.Client(api_key=key, http_options={"timeout": REQUEST_TIMEOUT_MS})
+        # No retries inside the SDK: on HTTP 429 it honours Retry-After, which can be
+        # hours (seen live: 21652 s), and the check would hang instead of failing.
+        client = genai.Client(
+            api_key=key, http_options={"timeout": REQUEST_TIMEOUT_MS, "retry_options": {"attempts": 1}}
+        )
         interaction = client.interactions.create(
             model=os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL,
-            input=_build_user_prompt(claim, context, school_name, docs, language),
-            system_instruction=SYSTEM_PROMPT,
-            generation_config=_generation_config(),
-            response_format={
-                "type": "text",
-                "mime_type": "application/json",
-                "schema": _LLMOutput.model_json_schema(),
-            },
+            input=prompt,
+            system_instruction=system,
+            generation_config=cfg,
+            response_format={"type": "text", "mime_type": "application/json", "schema": schema},
         )
         text = interaction.output_text
         usage = getattr(interaction, "usage", None)
@@ -501,6 +515,18 @@ def analyze(claim: str, context: dict, school_key: str, docs: list[dict], langua
         raise CheckError(_friendly_api_error(e)) from e
     if not text:  # e.g. the response was blocked
         raise CheckError("We couldn't produce a reliable answer. Please try rephrasing the claim.")
+    return text
+
+
+def analyze(claim: str, context: dict, school_key: str, docs: list[dict], language: str, config: Optional[dict] = None, stats: Optional[dict] = None) -> _LLMOutput:
+    config = config or load_config()
+    school_name = config["schools"][school_key]["name"]
+    text = _generate(
+        SYSTEM_PROMPT,
+        _build_user_prompt(claim, context, school_name, docs, language),
+        _LLMOutput.model_json_schema(),
+        stats=stats,
+    )
     try:
         return _LLMOutput.model_validate_json(text)
     except ValidationError as e:
@@ -516,7 +542,7 @@ def validate_output(out: _LLMOutput, docs: list[dict]) -> "tuple[list[Source], V
         d = by_url.get(s.url)
         if not d or s.url in seen:
             continue
-        if not s.quote.strip() or _norm(s.quote) not in _norm(d["text"]):
+        if len(s.quote.split()) < MIN_QUOTE_WORDS or _norm(s.quote) not in _norm(d["text"]):
             continue
         seen.add(s.url)
         sources.append(

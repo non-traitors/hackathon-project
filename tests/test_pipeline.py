@@ -291,3 +291,82 @@ def test_prompt_includes_todays_date():
 
     prompt = pipeline._build_user_prompt("c", {}, "School", [dict(DOCS[0], scope="federal")], "English")
     assert f"Today's date: {datetime.now(timezone.utc).date().isoformat()}" in prompt
+
+
+def test_analyze_uses_generate(monkeypatch):
+    seen = {}
+
+    def fake(system, prompt, schema, thinking=None, stats=None):
+        seen.update(system=system, prompt=prompt, schema=schema)
+        return _out("Unclear", []).model_dump_json()
+
+    monkeypatch.setenv("GEMINI_API_KEY", "x")
+    monkeypatch.setattr(pipeline, "_generate", fake, raising=False)
+    out = pipeline.analyze("claim", {}, "msu", DOCS, "English")
+    assert out.verdict == "Unclear"
+    assert seen["system"] == pipeline.SYSTEM_PROMPT and "claim" in seen["prompt"]
+
+
+def test_analyze_bad_json_is_friendly(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "x")
+    monkeypatch.setattr(pipeline, "_generate", lambda *a, **k: "not json", raising=False)
+    with pytest.raises(CheckError, match="reliable answer"):
+        pipeline.analyze("claim", {}, "msu", DOCS, "English")
+
+
+def test_generate_does_not_retry_inside_the_sdk(monkeypatch):
+    """A 429 must fail fast: the SDK's own retries honour Retry-After and can sleep for hours."""
+    import types
+
+    import google.genai as genai
+
+    seen = {}
+
+    class FakeClient:
+        def __init__(self, **kw):
+            seen.update(kw)
+            self.interactions = self
+
+        def create(self, **kw):
+            return types.SimpleNamespace(output_text="{}")
+
+    monkeypatch.setenv("GEMINI_API_KEY", "x")
+    monkeypatch.setattr(genai, "Client", FakeClient)
+    assert pipeline._generate("s", "p", {}) == "{}"
+    assert seen["http_options"]["retry_options"] == {"attempts": 1}
+    assert seen["http_options"]["timeout"] == pipeline.REQUEST_TIMEOUT_MS
+
+
+def test_rate_limit_error_is_a_friendly_message(monkeypatch):
+    import google.genai as genai
+
+    class Limited(Exception):
+        status_code = 429
+
+    class FakeClient:
+        def __init__(self, **kw):
+            self.interactions = self
+
+        def create(self, **kw):
+            raise Limited("Too Many Requests")
+
+    monkeypatch.setenv("GEMINI_API_KEY", "x")
+    monkeypatch.setattr(genai, "Client", FakeClient)
+    with pytest.raises(CheckError, match="usage limit"):
+        pipeline._generate("s", "p", {})
+
+
+@pytest.mark.parametrize("quote", ["on", "F-1", ".", "20 hours"])
+def test_trivial_quote_cannot_carry_a_verdict(quote):
+    """A quote of a word or two appears in any page, so it proves nothing."""
+    out = _out("Supported", [_LLMSource(url=DOCS[0]["url"], quote=quote, quote_translation="")])
+    sources, verdict = validate_output(out, DOCS)
+    assert sources == [] and verdict == "Unclear"
+
+
+def test_page_title_is_the_first_title_only():
+    """Pages repeat <title> inside inline icons; the source card must show it once."""
+    markup = ("<html><head><title>Employment | OISS</title></head><body><svg><title>icon</title></svg>"
+              "<p>Text.</p><title>Employment | OISS</title></body></html>")
+    title, text = pipeline.html_to_text(markup)
+    assert title == "Employment | OISS" and text == "Text."
