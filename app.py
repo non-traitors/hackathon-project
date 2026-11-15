@@ -209,16 +209,26 @@ def ask_box(key, label, button):
 
 
 # ---------- Screens ----------
+def save_selection(name):
+    """Keep preferences after the home-screen widgets disappear on a result."""
+    st.session_state[name] = st.session_state[f"_{name}_picker"]
+
+
 def home():
+    # Stable widget keys survive translated labels; separate preference keys
+    # survive Streamlit's cleanup when these widgets leave the screen.
+    for name in ("language", "school"):
+        st.session_state[f"_{name}_picker"] = st.session_state[name]
     with st.container(key="topbar"):
         school_col, language_col = st.columns([3, 2])
-    st.session_state["language"] = language_col.selectbox(
+    language_col.selectbox(
         langs.ui_text(lang_code(), "language_label"), LANGUAGES, label_visibility="collapsed",
-        index=LANGUAGES.index(st.session_state["language"]))
+        key="_language_picker", on_change=save_selection, args=("language",))
     direction_css()
     schools = list(SCHOOLS)
-    st.session_state["school"] = school_col.selectbox(
-        t("school_label"), schools, label_visibility="collapsed", index=schools.index(st.session_state["school"]))
+    school_col.selectbox(
+        t("school_label"), schools, label_visibility="collapsed",
+        key="_school_picker", on_change=save_selection, args=("school",))
     st.markdown(f'<div class="hero">{theme.stone(None, 112)}<h1 class="title">{esc(t("app_title"))}</h1>'
                 f'<p class="lead">{esc(t("tagline"))}</p></div>', unsafe_allow_html=True)
     beta_notice()

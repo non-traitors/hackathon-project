@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import pytest
 from streamlit.testing.v1 import AppTest
 
+import backend
 import languages as langs
 import pipeline
 import ui_adapter
@@ -110,6 +111,56 @@ def test_other_school_is_passed_as_its_key(monkeypatch):
     _school(at).set_value("University of Chicago").run()
     _check_first_starter(at)
     assert seen["school"] == "uchicago"
+
+
+@pytest.mark.parametrize("chat_mode", ["0", "1"])
+def test_consecutive_language_changes_apply_immediately(monkeypatch, chat_mode):
+    monkeypatch.setenv("USE_CHAT", chat_mode)
+    at = _open(monkeypatch)
+    for label in ["العربية", "English", "Русский", "中文", "繁體中文", "English"]:
+        _language(at).set_value(label).run()
+        code = langs.resolve_language(label)
+        assert not at.exception
+        assert at.session_state["language"] == _language(at).value == label
+        assert _language(at).label == langs.ui_text(code, "language_label")
+        assert esc(langs.ui_text(code, "app_title")) in _html(at)
+        assert [b.label.strip("“”") for b in _starters(at)] == langs.starters(code)
+
+
+@pytest.mark.parametrize("chat_mode", ["0", "1"])
+def test_consecutive_school_changes_apply_immediately(monkeypatch, chat_mode):
+    monkeypatch.setenv("USE_CHAT", chat_mode)
+    at = _open(monkeypatch)
+    for school in ["University of Chicago", "Michigan State University"] * 2:
+        _school(at).set_value(school).run()
+        assert not at.exception
+        assert at.session_state["school"] == _school(at).value == school
+
+
+@pytest.mark.parametrize("chat_mode", ["0", "1"])
+def test_selections_survive_language_changes_and_leaving_home(monkeypatch, chat_mode):
+    monkeypatch.setenv("USE_CHAT", chat_mode)
+
+    def unavailable(*args, **kwargs):
+        raise pipeline.CheckError("Offline test: service unavailable.")
+
+    monkeypatch.setattr(backend, "chat_stream", unavailable)
+    at = _open(monkeypatch, result=pipeline.CheckError("Offline test: service unavailable."))
+    _school(at).set_value("University of Chicago").run()
+    _language(at).set_value("العربية").run()
+    assert _school(at).value == "University of Chicago"
+    _check_first_starter(at)
+    assert not at.exception and any("Offline test" in e.value for e in at.error)
+    back = langs.ui_text("ar", "start_over" if chat_mode == "1" else "new_check")
+    next(b for b in at.button if b.label == back).click().run()
+    assert not at.exception
+    assert _school(at).value == "University of Chicago"
+    assert _language(at).value == "العربية"
+    _language(at).set_value("English").run()
+    _school(at).set_value("Michigan State University").run()
+    assert not at.exception
+    assert _language(at).value == "English"
+    assert _school(at).value == "Michigan State University"
 
 
 def test_contradicted_answer_gets_its_own_pill_not_a_grey_unclear_one(monkeypatch):
