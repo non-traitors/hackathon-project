@@ -4,7 +4,7 @@
     audio = speech.speak(speech.script(result))      # MP3 bytes, e.g. for st.audio(audio, format="audio/mp3")
 
 Both models detect the language themselves, so the same calls work for English,
-Arabic, Chinese, Russian or Uzbek. A transcript is plain text: it goes through the
+Arabic, Mandarin, Cantonese or Russian. A transcript is plain text: it goes through the
 agent's scope gate and quote check like anything typed.
 
 What leaves the machine: the answer text (for speak) and, only when the student
@@ -20,7 +20,7 @@ from pipeline import CheckError
 API_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice}"
 STT_URL = "https://api.elevenlabs.io/v1/speech-to-text"
 DEFAULT_VOICE = "EXAVITQu4vr4xnSDxMaL"  # "Sarah", an ElevenLabs premade voice; override with ELEVENLABS_VOICE_ID
-DEFAULT_MODEL = "eleven_v3"  # 70+ languages incl. Uzbek and Cantonese; override with ELEVENLABS_MODEL
+DEFAULT_MODEL = "eleven_v3"  # covers Cantonese, which eleven_multilingual_v2 does not; override with ELEVENLABS_MODEL
 STT_MODEL = "scribe_v3"
 MAX_AUDIO_BYTES = 10_000_000  # about a minute or two of speech is far below this
 MAX_CHARS = 1200  # characters read per answer; keeps each request small and cheap

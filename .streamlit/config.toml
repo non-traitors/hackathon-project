@@ -1,0 +1,8 @@
+# The interface is designed for a white page. Without this, a laptop in dark mode
+# gets a black page with unreadable navy text.
+[theme]
+base = "light"
+primaryColor = "#0B1FA8"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#EEF1F8"
+textColor = "#1B2F5B"

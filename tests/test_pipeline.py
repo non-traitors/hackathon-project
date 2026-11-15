@@ -362,3 +362,11 @@ def test_trivial_quote_cannot_carry_a_verdict(quote):
     out = _out("Supported", [_LLMSource(url=DOCS[0]["url"], quote=quote, quote_translation="")])
     sources, verdict = validate_output(out, DOCS)
     assert sources == [] and verdict == "Unclear"
+
+
+def test_page_title_is_the_first_title_only():
+    """Pages repeat <title> inside inline icons; the source card must show it once."""
+    markup = ("<html><head><title>Employment | OISS</title></head><body><svg><title>icon</title></svg>"
+              "<p>Text.</p><title>Employment | OISS</title></body></html>")
+    title, text = pipeline.html_to_text(markup)
+    assert title == "Employment | OISS" and text == "Text."
