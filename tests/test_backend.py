@@ -56,8 +56,9 @@ def test_check_claim_matches_frontend_shape(fake_run):
     assert r["trace"] == [{"kind": "plan", "label": "Choosing official pages to read", "detail": []}]
     assert set(r) == {
         "claim", "verdict", "headline", "explanation", "sources", "applies_to", "exceptions",
-        "clarifying_question", "next_step", "question_for_office", "checked_at", "trace",
+        "clarifying_question", "next_step", "question_for_office", "checked_at", "trace", "in_scope",
     }
+    assert r["in_scope"] is True
 
 
 def test_rule_status_wins_the_pill(monkeypatch, fake_run):
@@ -94,3 +95,11 @@ def test_stream_fills_the_cache(fake_run):
 def test_long_first_sentence_headline_is_cut(monkeypatch, fake_run):
     monkeypatch.setattr(agent, "run", lambda *a, **k: iter([[_result(explanation="word " * 60)]]))
     assert len(backend.check_claim("c", "English", "msu")["headline"]) <= 120
+
+
+def test_out_of_scope_result_has_its_own_pill_and_headline(monkeypatch, fake_run):
+    off = _result(verdict="Unclear", in_scope=False, explanation=agent.OUT_OF_SCOPE, sources=[])
+    monkeypatch.setattr(agent, "run", lambda *a, **k: iter([[off]]))
+    r = backend.check_claim("write me a script", "English", "msu")
+    assert r["verdict"] == "Out of scope" and r["in_scope"] is False
+    assert r["headline"] == backend.OUT_OF_SCOPE_HEADLINE and r["sources"] == []

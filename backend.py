@@ -31,6 +31,8 @@ LANGUAGES = {
     "O'zbekcha": "Uzbek",
 }
 HEADLINE_CHARS = 120
+OUT_OF_SCOPE_VERDICT = "Out of scope"
+OUT_OF_SCOPE_HEADLINE = "That's outside what this checker covers."
 
 _cache: dict[tuple[str, str, str], list[dict]] = {}
 
@@ -67,11 +69,17 @@ def _source(s: pipeline.Source) -> dict:
 
 
 def _to_dict(r: agent.AgentResult) -> dict:
+    if not r.in_scope:
+        verdict, headline = OUT_OF_SCOPE_VERDICT, OUT_OF_SCOPE_HEADLINE
+    else:
+        # One pill: the rule status for rule-change rumors, otherwise the verdict.
+        verdict = r.rule_status if r.rule_status != "Not applicable" else r.verdict
+        headline = _headline(r.explanation)
     return {
         "claim": r.claim,
-        # One pill: the rule status for rule-change rumors, otherwise the verdict.
-        "verdict": r.rule_status if r.rule_status != "Not applicable" else r.verdict,
-        "headline": _headline(r.explanation),
+        "in_scope": r.in_scope,
+        "verdict": verdict,
+        "headline": headline,
         "explanation": r.explanation,
         "sources": [_source(s) for s in r.sources],
         "applies_to": list(r.applies_to),
