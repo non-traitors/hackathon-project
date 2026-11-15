@@ -93,3 +93,37 @@ def to_ui(result: pipeline.CheckResult, school_key: str, config: Optional[dict] 
         "cached": bool(result.timing.get("cached")),
         "checked_at": result.checked_at,  # ISO time the check ran (not when a page was updated)
     }
+
+
+def chat_to_ui(reply, school_key: str, config: Optional[dict] = None) -> dict:
+    """Everything the chat thread needs to draw one reply (a chat.Reply)."""
+    config = config or pipeline.load_config()
+    code = reply.language
+    office = office_for(school_key, config)
+    facts = [
+        {
+            "statement": f.statement,
+            "title": f.title or f.url,
+            "url": f.url,
+            "domain": urlparse(f.url).hostname or "",
+            "category": reply.school if f.scope == "school" else "U.S. Government",
+            "date": f.date,  # None when the page states no date: never invented
+            "date_text": f.date or langs.ui_text(code, "date_unknown"),
+            "quote": f.quote,  # always the original English wording
+            "quote_translation": f.quote_translation,
+        }
+        for f in reply.facts
+    ]
+    return {
+        "kind": reply.kind,  # verdict, facts or notice
+        "asked": reply.asked,  # the message as understood, standing alone
+        "text": reply.text,  # notice: fixed text
+        "results": [dict(to_ui(r, school_key, config), claim=r.claim) for r in reply.results],
+        "facts": facts,
+        "question_for_office": reply.question_for_office,  # English, to send to the office
+        "out_of_scope": reply.out_of_scope,
+        "office": office,
+        "rtl": langs.is_rtl(code),
+        "language": code,
+        "checked_at": reply.checked_at,
+    }

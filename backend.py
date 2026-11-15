@@ -18,6 +18,7 @@ import time
 from typing import Iterator
 
 import agent
+import chat
 import pipeline
 import ui_adapter
 from pipeline import CheckError
@@ -79,3 +80,19 @@ def check_all(text: str, language: str, school: str) -> list[dict]:
 def check_claim(claim: str, language: str, school: str) -> dict:
     """The first (usually only) result, in the shape app.py draws."""
     return check_all(claim, language, school)[0]
+
+
+def chat_stream(message: str, history: list[dict], language: str, school: str) -> Iterator[dict]:
+    """One chat turn. Yield {"step": {...}} for each step, then {"reply": {...}, "history": [...]}.
+
+    `history` is what the last turn returned (start with an empty list). It holds only the
+    student's words and verified quotes, and the caller keeps it; nothing is stored here.
+    """
+    school_key = _school_key(school)
+    config = pipeline.load_config()
+    for item in chat.respond(message, history, school_key, language):
+        if isinstance(item, agent.Step):
+            yield {"step": item.model_dump()}
+        else:
+            yield {"reply": ui_adapter.chat_to_ui(item, school_key, config),
+                   "history": chat.remember(history, message, item)}

@@ -84,6 +84,14 @@ languages:
       step_read: 'Reading the official pages for your school'
       step_compare: 'Comparing your claim with what they say'
       step_verify: 'Checking every quote against the page text'
+      chat_hello: "Hi. Ask about OPT, CPT, work, taxes or your status as an international student. Every answer comes with the exact words from an official page."
+      chat_no_facts: "We couldn't find this on the official pages we read, so we won't guess. Ask your school's international student office."
+      chat_limit: "This chat is getting long. Start a new one to keep going."
+      follow_up: "Ask a follow-up question"
+      send: "Ask"
+      start_over: "Start over"
+      facts_title: "What the official pages say"
+      understood_as: "We understood this as"
     glossary: {}
     keywords: {}
 
@@ -148,6 +156,14 @@ languages:
       step_read: 'قراءة الصفحات الرسمية الخاصة بجامعتك'
       step_compare: 'مقارنة ادعائك بما تقوله هذه الصفحات'
       step_verify: 'التحقق من كل اقتباس مقابل نص الصفحة'
+      chat_hello: "مرحبًا. اسأل عن OPT أو CPT أو العمل أو الضرائب أو وضعك كطالب دولي. كل إجابة تأتي مع النص الحرفي من صفحة رسمية."
+      chat_no_facts: "لم نجد هذا في الصفحات الرسمية التي قرأناها، لذلك لن نخمّن. اسأل مكتب الطلاب الدوليين في جامعتك."
+      chat_limit: "أصبحت هذه المحادثة طويلة. ابدأ محادثة جديدة للمتابعة."
+      follow_up: "اطرح سؤال متابعة"
+      send: "اسأل"
+      start_over: "ابدأ من جديد"
+      facts_title: "ما تقوله الصفحات الرسمية"
+      understood_as: "فهمنا سؤالك هكذا"
     glossary:
       OPT: التدريب العملي الاختياري (OPT)
       STEM OPT: تمديد التدريب العملي لتخصصات STEM (STEM OPT)
@@ -229,6 +245,14 @@ languages:
       step_read: '正在阅读与你学校相关的官方页面'
       step_compare: '正在把你的说法与页面内容对照'
       step_verify: '正在逐句核对引文与页面原文'
+      chat_hello: "你好。可以问 OPT、CPT、工作、报税或国际学生身份的问题。每个回答都附有官方页面的原文。"
+      chat_no_facts: "我们在读过的官方页面上没有找到相关内容，所以不会猜测。请咨询学校的国际学生办公室。"
+      chat_limit: "这段对话已经很长了。请开始新的对话。"
+      follow_up: "继续提问"
+      send: "提问"
+      start_over: "重新开始"
+      facts_title: "官方页面的说法"
+      understood_as: "我们对问题的理解"
     glossary:
       OPT: 选择性实习培训（OPT）
       STEM OPT: STEM OPT延期（24个月）
@@ -310,6 +334,14 @@ languages:
       step_read: '正在閱讀與你學校相關的官方頁面'
       step_compare: '正在把你的說法與頁面內容對照'
       step_verify: '正在逐句核對引文與頁面原文'
+      chat_hello: "你好。可以問 OPT、CPT、工作、報稅或者國際學生身份嘅問題。每個答案都附有官方網頁嘅原文。"
+      chat_no_facts: "我哋喺讀過嘅官方網頁搵唔到相關內容，所以唔會亂估。請向學校嘅國際學生辦公室查詢。"
+      chat_limit: "呢段對話已經好長。請開始新嘅對話。"
+      follow_up: "繼續發問"
+      send: "發問"
+      start_over: "重新開始"
+      facts_title: "官方網頁嘅講法"
+      understood_as: "我哋對問題嘅理解"
     glossary:
       OPT: 選擇性實習培訓（OPT）
       STEM OPT: STEM OPT延期（24個月）
@@ -391,6 +423,14 @@ languages:
       step_read: 'Читаем официальные страницы вашего вуза'
       step_compare: 'Сравниваем ваше утверждение с их текстом'
       step_verify: 'Сверяем каждую цитату с текстом страницы'
+      chat_hello: "Здравствуйте. Спрашивайте про OPT, CPT, работу, налоги или статус иностранного студента. К каждому ответу приложены точные слова с официальной страницы."
+      chat_no_facts: "Мы не нашли этого на официальных страницах, которые прочитали, поэтому не будем гадать. Спросите в офисе для иностранных студентов вашего вуза."
+      chat_limit: "Этот чат стал слишком длинным. Начните новый, чтобы продолжить."
+      follow_up: "Задайте уточняющий вопрос"
+      send: "Спросить"
+      start_over: "Начать заново"
+      facts_title: "Что говорят официальные страницы"
+      understood_as: "Мы поняли вопрос так"
     glossary:
       OPT: Опциональная практическая подготовка (OPT)
       STEM OPT: Продление OPT для STEM-специальностей (STEM OPT)

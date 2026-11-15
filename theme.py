@@ -143,6 +143,11 @@ html, body, [class*="css"] {{ font-family:{SANS}; color:{NAVY}; }}
 .asked {{ color:{GRAY}; font-size:.9rem; margin-bottom:.4rem; }}
 .label {{ font-weight:600; margin:1.2rem 0 .5rem; }}
 .box {{ background:{SOFT}; border-radius:12px; padding:12px 16px; margin-top:.8rem; }}
+.stMarkdown p.said {{ background:{SOFT}; color:{NAVY}; border-radius:16px 16px 4px 16px; padding:10px 14px;
+  margin-block:1.6rem .9rem; margin-inline:auto 0; width:fit-content; max-width:85%; overflow-wrap:anywhere; }}
+.fact {{ margin-top:1rem; }}
+.fact .statement {{ font-weight:600; color:{NAVY}; margin:0 0 .4rem; }}
+.stone-row h2.answer {{ margin:0; }}
 .pill {{ display:inline-block; padding:4px 12px; border-radius:999px; font-weight:600; margin:0 6px 6px 0; }}
 .pill.mini {{ font-size:.8rem; padding:2px 10px; }}
 details.legend {{ margin-top:1.2rem; color:{GRAY}; }}

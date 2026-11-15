@@ -54,6 +54,25 @@ Verdict + explanation + source links
 
 The verdict labels will stay in English across languages. The explanation will use the selected language.
 
+### Chat
+
+`chat.py` turns the checker into a conversation, and it is what `app.py` runs by default. A student can ask a question, then a follow-up, then check a rumor, in one thread. The rule is the same as everywhere else: nothing the model writes is shown unless a quote from an official page backs it.
+
+Each reply is one of three things:
+
+- **A verdict**, when the message is a rumor. It goes through the agent below and comes back as Supported, Contradicted or Unclear.
+- **Facts**, when the message is a question such as "how many hours can I work on campus?". Each fact is one sentence plus the exact quote and link behind it. Code drops any fact whose quote is not found word for word (at least 4 words) on a page that was fetched. If no fact survives, the student sees fixed text saying we could not confirm it, and the question to send to their school's office.
+- **Fixed text**, for an off-topic message, a greeting, or a chat that has grown past 20 turns.
+
+How one turn is bounded:
+
+1. Limits before any model call: 600 characters per message, 20 turns per chat, and the keyword scope gate.
+2. One small routing call decides whether the message is in scope, whether it is a rumor, a question or a greeting, and rewrites a follow-up ("what about STEM?") so it stands alone. If that call fails, nothing is read and the student is asked to try again.
+3. A question is planned with the agent's plan call, which is a second scope gate, then reads at most 6 allowlisted pages with at most 4 model calls in total.
+4. Memory holds only the student's own words and the quotes that were verified. Sentences the model wrote and raw page text are never fed back in. The history lives in the browser session and is never written to disk.
+
+`USE_CHAT=0` turns the chat off and goes back to the single check (one claim, one answer). The chat is covered by offline tests (`tests/test_chat.py`, `tests/test_app_chat.py`). **It has not completed a full live conversation yet:** on the morning of 2026-11-15 the Gemini API was returning "high demand" errors and timeouts, so only the routing call was seen working live.
+
 ### Agent mode
 
 `agent.py` adds a bounded agent on top of the single-pass check. It has been run live against the Gemini API (2026-11-14): its golden claims and the pasted-message test pass, with the same verdicts as the single-pass check. Claims it answers in one reading round take about 10 to 13 seconds, the same as the single-pass check; claims that need extra rounds take about 26 to 34 seconds, and the extra time does not always help (the OPT fee claim took 34 seconds and still ended **Unclear**, because no allowed page's text states the fee). The tests are in `tests/live_golden.py`, run with `-k agent`.
