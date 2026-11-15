@@ -182,18 +182,23 @@ class _TextExtractor(HTMLParser):
         self.title = ""
         self._skip = 0
         self._in_title = False
+        self._title_done = False  # only the page's first <title>; inline icons repeat it
 
     def handle_starttag(self, tag, attrs):
         if tag in self._SKIP:
             self._skip += 1
         elif tag == "title":
-            self._in_title = True
+            if self._title_done or self._skip:
+                self._skip += 1  # a repeated title is neither the title nor page text
+            else:
+                self._in_title = True
 
     def handle_endtag(self, tag):
-        if tag in self._SKIP and self._skip:
-            self._skip -= 1
-        elif tag == "title":
+        if tag == "title" and self._in_title:
             self._in_title = False
+            self._title_done = True
+        elif (tag in self._SKIP or tag == "title") and self._skip:
+            self._skip -= 1
 
     def handle_data(self, data):
         if self._in_title:

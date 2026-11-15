@@ -64,6 +64,9 @@ languages:
       last_updated: "Last updated"
       legend_title: "What each verdict means"
       legend_note: "A proposal is not a rule in effect."
+      listen: "Listen"
+      speak_label: "Or ask out loud"
+      you_asked: "You asked"
     glossary: {}
     keywords: {}
 
@@ -112,6 +115,9 @@ languages:
       last_updated: "آخر تحديث"
       legend_title: "ماذا تعني كل نتيجة"
       legend_note: "الاقتراح ليس قاعدة سارية المفعول."
+      listen: "استمع"
+      speak_label: "أو اسأل بصوتك"
+      you_asked: "سألت"
     glossary:
       OPT: التدريب العملي الاختياري (OPT)
       STEM OPT: تمديد التدريب العملي لتخصصات STEM (STEM OPT)
@@ -177,6 +183,9 @@ languages:
       last_updated: "最后更新"
       legend_title: "各个结论的含义"
       legend_note: "提案不等于已生效的规定。"
+      listen: "收听"
+      speak_label: "或者用语音提问"
+      you_asked: "你问的是"
     glossary:
       OPT: 选择性实习培训（OPT）
       STEM OPT: STEM OPT延期（24个月）
@@ -242,6 +251,9 @@ languages:
       last_updated: "最後更新"
       legend_title: "各個結論嘅意思"
       legend_note: "建議並不等於已生效嘅規定。"
+      listen: "收聽"
+      speak_label: "或者用語音提問"
+      you_asked: "你問的是"
     glossary:
       OPT: 選擇性實習培訓（OPT）
       STEM OPT: STEM OPT延期（24個月）
@@ -307,6 +319,9 @@ languages:
       last_updated: "Обновлено"
       legend_title: "Что означает каждый вердикт"
       legend_note: "Предложенное правило — это не действующее правило."
+      listen: "Прослушать"
+      speak_label: "Или спросите голосом"
+      you_asked: "Вы спросили"
     glossary:
       OPT: Опциональная практическая подготовка (OPT)
       STEM OPT: Продление OPT для STEM-специальностей (STEM OPT)
