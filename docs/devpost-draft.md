@@ -44,7 +44,7 @@ When the answer is Unclear, it does not leave you there. It writes the question 
 
 **Languages.** One registry file holds the interface text, a glossary of key terms, and routing keywords for each language.
 
-**Tests.** 232 automated tests run without any API key. They cover the quote check, the allowlist, the limits, the fallback, and the scope gate.
+**Tests.** 272 automated tests run without any API key. They cover the quote check, the allowlist, the limits, the fallback, and the scope gate.
 
 ## Challenges we ran into
 
@@ -62,7 +62,7 @@ When the answer is Unclear, it does not leave you there. It writes the question 
 - A golden set of real rumors that passes against live official pages, in English and Arabic.
 - An agent that is bounded by code, not by hope: fixed limits, a fixed allowlist, and a scope gate that fails closed.
 - Voice that works in both directions: ask out loud, and listen to the answer.
-- 232 tests written in 24 hours, and a review that found real bugs before the judges did.
+- 272 tests written in 24 hours, and a review that found real bugs before the judges did.
 
 ## What we learned
 
@@ -98,9 +98,9 @@ The rules ask us to say which AI tools we used and how.
 These lines in the draft are ahead of what is verified or shipped right now. Fix the product or soften the sentence.
 
 1. **"You can also ask by voice and listen to the answer."** Both are in the app now. Voice in was run end to end in a browser with a spoken English clip fed in as the microphone. Nobody has spoken into a physical microphone yet, so try it once on the demo laptop and allow the microphone when the browser asks.
-2. **The agent.** It is built and passes its offline tests, but it has not completed a live run, and `app.py` still uses the simple checker. If that is still true at noon, change "we built a bounded agent" to say it ships behind a switch, and do not demo it as the default.
+2. **The agent.** The readme says it ran live against Gemini on Nov 14 and gave the same verdicts as the simple checker. `app.py` still uses the simple checker unless `USE_AGENT=1` is set, and some claims take up to 34 seconds in agent mode. If you demo the agent, set the switch and use a Gemini key with real quota. If you do not, say it ships behind a switch.
 3. **"A golden set that passes in English and Arabic."** This comes from the readme's note on the earlier live run. Rerun it after the merge before repeating the claim.
 4. **Languages.** The registry marks the non English languages as drafts not yet reviewed by a native speaker. "What's next" says so, but make sure the app shows its beta notice in the demo.
-5. **Voice in other languages.** The audio round trip was verified in English. Arabic, Mandarin, Cantonese and Russian audio has not been checked by a speaker.
-6. **Test count.** 232 on `main`. Update the number if it changes.
+5. **Voice in other languages.** The audio round trip was verified in English. Each language now sends a fixed ElevenLabs language code, with 繁體中文 as Cantonese, but those codes have not been tried against live ElevenLabs. Arabic, Mandarin, Cantonese and Russian audio has not been checked by a speaker.
+6. **Test count.** 272 on `main`. Update the number if it changes.
 7. **Required attachments:** a public GitHub link and a demo video of 3 minutes or less.
