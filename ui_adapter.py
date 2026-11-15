@@ -31,6 +31,14 @@ def _pill(code: str, label: str) -> dict:
     return {"label": label, "text": text, "kind": PILL_KIND[label]}
 
 
+def legend(code: str) -> dict:
+    """Pills explaining each label, for the "what each verdict means" strip."""
+    return {
+        "verdicts": [_pill(code, v) for v in ("Supported", "Contradicted", "Unclear")],
+        "rule_statuses": [_pill(code, v) for v in ("In effect", "Proposed only", "Blocked")],
+    }
+
+
 def office_for(school_key: str, config: Optional[dict] = None) -> dict:
     config = config or pipeline.load_config()
     s = config["schools"][school_key]

@@ -10,7 +10,7 @@ Built by a team of international students for a 24-hour hackathon, for the **Fut
 
 [Repository](https://github.com/non-traitors/hackathon-project) · [Original project discussion](https://chatgpt.com/share/6af89ad7-5270-83ea-aeb2-fcc30b3aeecf)
 
-> **Project status:** Early implementation. The checking backend, source list, language registry and UI adapter are in the repository and have been run live against the Gemini API. The live tests pass: eight golden claims (English and Arabic, MSU and UChicago), a prompt-injection check, and a cross-language check in which Arabic, Mandarin, Cantonese and Russian each kept English's verdict and cited a page in common with it. An uncached check takes about 9 seconds on average and up to about 13 seconds (up to about 19 seconds in some non-English answers); repeat checks are instant. The main interface (`app.py`) still shows a placeholder result and is not yet connected to the backend; `app_prototype.py` is wired to it. All non-English text (interface strings, glossary, routing keywords, starter claims) is a draft that no native speaker has reviewed, so those languages are labeled beta. Fee questions such as "OPT now costs $70,000" correctly return **Unclear** because the fee amounts are in USCIS tables that are not in the page text. Deployment is still to be built.
+> **Project status:** Early implementation. The checking backend, source list, language registry and UI adapter are in the repository and have been run live against the Gemini API. The live tests pass: eight golden claims (English and Arabic, MSU and UChicago), a prompt-injection check, and a cross-language check in which Arabic, Mandarin, Cantonese and Russian each kept English's verdict and cited a page in common with it. An uncached check takes about 9 seconds on average and up to about 13 seconds (up to about 19 seconds in some non-English answers); repeat checks are instant. The main interface (`app.py`, Dark28A's layout) is connected to the backend and was click-tested live in English, Arabic, Russian and 繁體中文, including a firm answer, the "Unclear" flow with the English question for the school's office, and an out-of-scope claim; `app_prototype.py` is an alternate wired interface with extra optional context fields. All non-English text (interface strings, glossary, routing keywords, starter claims) is a draft that no native speaker has reviewed, so those languages are labeled beta. Fee questions such as "OPT now costs $70,000" correctly return **Unclear** because the fee amounts are in USCIS tables that are not in the page text. Deployment is still to be built.
 
 ## Why we are building this
 
@@ -143,9 +143,9 @@ python3.13 -m venv .venv313   # any Python 3.10+
 .venv313/bin/python -m pytest
 ```
 
-To run the checker against the Gemini API you need a Gemini API key. Copy `.env.example` to `.env` and set `GEMINI_API_KEY`; keep real keys in `.env`, local environment variables, or the deployment platform's secret store, never in version control. `app.py` does not call the backend yet; `app_prototype.py` is a standalone interface that does (`.venv313/bin/streamlit run app_prototype.py`); the pipeline it calls has been tested live, but that interface has not been clicked through with a live key.
+To run the checker against the Gemini API you need a Gemini API key. Copy `.env.example` to `.env` and set `GEMINI_API_KEY`; keep real keys in `.env`, local environment variables, or the deployment platform's secret store, never in version control. Then start the app with `.venv313/bin/streamlit run app.py`. It reads the key from `.env` (or Streamlit secrets on a deployment).
 
-The backend milestone is reached: English and Arabic claims were checked end to end with a live key. The next milestone is connecting the main interface (`app.py`); when that is done, update this section with the verified launch command.
+The first milestone is reached: claims are checked end to end through the real interface with a live key, in all five languages' pipeline paths. Still to do: native-speaker review of the non-English text, deployment, and a faster first answer (see Limitations).
 
 ### Proposed file layout
 
@@ -154,8 +154,8 @@ Current files:
 ```text
 hackathon-project/
 ├── readme.md          # Project overview and implementation plan
-├── app.py             # Streamlit interface (placeholder result, not yet connected)
-├── app_prototype.py   # Standalone interface wired to the backend, in five languages
+├── app.py             # Streamlit interface (Dark28A's design), wired to the backend
+├── app_prototype.py   # Alternate wired interface with optional context fields
 ├── pipeline.py        # Fetch official pages, call Gemini, verify citations, cache
 ├── languages.py       # Loads the language registry
 ├── languages.yaml     # Languages: UI strings, glossary, routing keywords, starter claims (non-English drafts)
@@ -218,6 +218,8 @@ Before calling the MVP ready, verify that:
 ## Limitations and responsible use
 
 This is a hackathon prototype. Verdicts and translations can be wrong, official pages can be outdated, and the initial source list does not cover every university or topic. The tool is intended to help students find and understand evidence, not determine their eligibility or replace advice about their individual situation.
+
+Known limits today: a check that has not been asked before takes about 9 to 13 seconds (up to about 19 seconds in some non-English answers), while repeat checks are instant; only MSU and the University of Chicago are covered; banking and other topics outside the curated sources get an "outside what we can check" answer; fee amounts that live in USCIS tables, not page text, cannot be confirmed; and all non-English wording is an unreviewed draft.
 
 The planned notice under each result is:
 
