@@ -72,9 +72,18 @@ What the agent may decide is what to read. What it may not decide is the answer 
 
 **Staying on topic.** The planning step also decides whether the input is about being an international student in the United States. If it is not, the agent stops before reading any page and returns a fixed reply written in code, which the model cannot change. If the planning call itself fails, scope is unknown, so the agent fails closed: it reads nothing, skips the single-pass check, and asks the student to try again. This gate is one layer of several: every prompt treats the claim, the pasted message and page text as untrusted, the model can only open URLs it was shown, and a verdict still needs a verified quote. The interface shows these results with an **Out of scope** label.
 
-### Read aloud
+### Voice in and voice out
 
-`speech.py` turns an answer into audio with ElevenLabs text to speech, so a student can listen to the verdict and explanation in the answer language. It is one function, `speech.speak(speech.script(result))`, returning MP3 bytes for `st.audio`. Only the answer text is sent to ElevenLabs, never the student's own message. It needs `ELEVENLABS_API_KEY`; without one, `speech.available()` is false and the interface should hide the button. It is covered by offline tests and **has not been run against the live ElevenLabs API yet**. The default model is multilingual; Uzbek support is unconfirmed.
+`speech.py` lets a student speak a question and listen to the answer, using ElevenLabs.
+
+- **Voice in.** `speech.transcribe(recording)` sends the recording to ElevenLabs speech to text (`scribe_v3`) and returns the text. The transcript then goes through the agent like anything typed, so the scope gate, the allowlist and the verified-quote rule all still apply.
+- **Voice out.** `speech.speak(speech.script(result))` returns MP3 audio of the verdict and explanation, using ElevenLabs text to speech (`eleven_v3`, which covers 70+ languages including Uzbek and Cantonese).
+
+In Streamlit this is `st.audio_input` for the recording and `st.audio` for playback. Both calls need `ELEVENLABS_API_KEY`; without one, `speech.available()` is false and the interface should hide the voice controls. If ElevenLabs fails, the student sees a short message and can type instead; the written answer is never affected.
+
+**What is sent to ElevenLabs:** the answer text, and the student's recording only when they choose to speak. Typed questions are never sent there.
+
+**Verified live on 2026-11-14:** an English and an Uzbek answer were turned into audio (about 2 seconds each) and transcribed back correctly (under 1 second each). Arabic, Chinese and Cantonese audio has not been listened to by a speaker of those languages.
 
 ## MVP scope
 
@@ -181,7 +190,7 @@ hackathon-project/
 ├── pipeline.py        # Fetch official pages, call Gemini, verify citations (single-pass check)
 ├── agent.py           # Bounded agent: plans what to read, follows official links, verifies quotes
 ├── backend.py         # Bridge for app.py: check_claim(claim, language, school) and a live step stream
-├── speech.py          # Read an answer aloud with ElevenLabs text to speech
+├── speech.py          # Voice in (speech to text) and voice out (text to speech) with ElevenLabs
 ├── sources.yaml       # Allowlist, topic keywords, curated source pages
 ├── requirements.txt   # Python dependencies
 ├── .env.example       # Configuration template with no real keys (GEMINI_API_KEY, optional model and thinking level)
@@ -252,7 +261,7 @@ Students at other institutions should confirm with their own international stude
 The hackathon rules ask teams to say which AI tools they used and how.
 
 - **Gemini API** is part of the product: it reads the fetched official pages and writes the explanation.
-- **ElevenLabs** is part of the product: it reads the answer aloud (`speech.py`).
+- **ElevenLabs** is part of the product: it transcribes spoken questions and reads answers aloud (`speech.py`).
 - **Claude Code** was used to audit the repository and to write `agent.py`, `backend.py`, `speech.py` and their tests, from a design and plan the team reviewed (`docs/superpowers/`).
 - **ChatGPT** was used for the original project discussion linked at the top of this file.
 - _Team: add any other tools used for the pipeline, the interface or the design here before submitting._

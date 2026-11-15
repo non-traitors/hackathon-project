@@ -10,8 +10,13 @@ from pipeline import CheckError
 
 
 class _Resp:
-    def __init__(self, status=200, content=b"MP3"):
-        self.status_code, self.content = status, content
+    def __init__(self, status=200, content=b"MP3", data=None):
+        self.status_code, self.content, self._data = status, content, data
+
+    def json(self):
+        if self._data is None:
+            raise ValueError("not json")
+        return self._data
 
 
 @pytest.fixture
@@ -22,8 +27,8 @@ def posts(monkeypatch):
     class Box:
         reply = _Resp()
 
-    def fake_post(url, headers=None, json=None, timeout=None):
-        sent.append({"url": url, "headers": headers, "json": json, "timeout": timeout})
+    def fake_post(url, headers=None, json=None, timeout=None, files=None, data=None):
+        sent.append({"url": url, "headers": headers, "json": json, "timeout": timeout, "files": files, "data": data})
         if isinstance(Box.reply, Exception):
             raise Box.reply
         return Box.reply
@@ -98,3 +103,42 @@ def test_script_reads_the_verdict_then_the_explanation():
 def test_script_for_out_of_scope_is_just_the_reply():
     r = {"in_scope": False, "verdict": "Out of scope", "explanation": "This checker only covers student questions."}
     assert speech.script(r) == "This checker only covers student questions."
+
+
+# ------------------------------------------------------------- speech to text
+def test_defaults_cover_the_languages_the_app_offers():
+    """eleven_v3 is the text-to-speech model that includes Uzbek and Cantonese."""
+    assert speech.DEFAULT_MODEL == "eleven_v3" and speech.STT_MODEL == "scribe_v3"
+
+
+def test_transcribe_uploads_the_recording_and_returns_its_text(posts):
+    posts.reply = _Resp(data={"text": "  Is OPT cancelled?  ", "language_code": "en"})
+    assert speech.transcribe(b"RIFFdata", "question.wav") == "Is OPT cancelled?"
+    call = posts.sent[0]
+    assert call["url"] == "https://api.elevenlabs.io/v1/speech-to-text"
+    assert call["headers"]["xi-api-key"] == "k" and call["data"] == {"model_id": speech.STT_MODEL}
+    assert call["files"]["file"][0] == "question.wav" and call["files"]["file"][1] == b"RIFFdata"
+
+
+def test_transcribe_rejects_empty_and_oversized_audio_without_sending(posts):
+    with pytest.raises(CheckError):
+        speech.transcribe(b"")
+    with pytest.raises(CheckError, match="shorter"):
+        speech.transcribe(b"x" * (speech.MAX_AUDIO_BYTES + 1))
+    assert posts.sent == []
+
+
+def test_transcribe_without_a_key_is_a_friendly_error(posts, monkeypatch):
+    monkeypatch.delenv("ELEVENLABS_API_KEY")
+    with pytest.raises(CheckError, match="ELEVENLABS_API_KEY"):
+        speech.transcribe(b"RIFFdata")
+    assert posts.sent == []
+
+
+@pytest.mark.parametrize(
+    "reply", [_Resp(401, data={}), _Resp(200), _Resp(200, data={"text": "   "}), _Resp(200, data=["x"]), OSError("down")]
+)
+def test_transcribe_failures_ask_the_student_to_retry_or_type(posts, reply):
+    posts.reply = reply
+    with pytest.raises(CheckError, match="type your question"):
+        speech.transcribe(b"RIFFdata")

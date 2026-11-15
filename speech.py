@@ -1,10 +1,14 @@
-"""Read an answer aloud with ElevenLabs text to speech.
+"""Voice in and voice out with ElevenLabs.
 
-    audio = speech.speak(speech.script(result))   # MP3 bytes, e.g. for st.audio(audio, format="audio/mp3")
+    text = speech.transcribe(recording.getvalue())   # the student's spoken question, as text
+    audio = speech.speak(speech.script(result))      # MP3 bytes, e.g. for st.audio(audio, format="audio/mp3")
 
-The default model is multilingual and detects the language from the text, so the
-same call works for an English, Arabic, Chinese or Russian explanation. Only the
-answer text is sent to ElevenLabs, never the student's own message.
+Both models detect the language themselves, so the same calls work for English,
+Arabic, Chinese, Russian or Uzbek. A transcript is plain text: it goes through the
+agent's scope gate and quote check like anything typed.
+
+What leaves the machine: the answer text (for speak) and, only when the student
+chooses to speak, their recording (for transcribe).
 """
 from __future__ import annotations
 
@@ -14,12 +18,16 @@ import re
 from pipeline import CheckError
 
 API_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice}"
-DEFAULT_VOICE = "21m00Tcm4TlvDq8ikWAM"  # "Rachel", an ElevenLabs premade voice; override with ELEVENLABS_VOICE_ID
-DEFAULT_MODEL = "eleven_multilingual_v2"  # override with ELEVENLABS_MODEL
+STT_URL = "https://api.elevenlabs.io/v1/speech-to-text"
+DEFAULT_VOICE = "EXAVITQu4vr4xnSDxMaL"  # "Sarah", an ElevenLabs premade voice; override with ELEVENLABS_VOICE_ID
+DEFAULT_MODEL = "eleven_v3"  # 70+ languages incl. Uzbek and Cantonese; override with ELEVENLABS_MODEL
+STT_MODEL = "scribe_v3"
+MAX_AUDIO_BYTES = 10_000_000  # about a minute or two of speech is far below this
 MAX_CHARS = 1200  # characters read per answer; keeps each request small and cheap
 TIMEOUT = 30
 CACHE_SIZE = 32
 FAILED = "We couldn't read this aloud right now. The written answer is unchanged."
+NOT_HEARD = "We couldn't make out the recording. Please try again, or type your question."
 
 _cache: dict[tuple[str, str, str], bytes] = {}
 
@@ -80,3 +88,30 @@ def speak(text: str) -> bytes:
         _cache.pop(next(iter(_cache)))
     _cache[cache_key] = r.content
     return r.content
+
+
+def transcribe(audio: bytes, filename: str = "question.wav") -> str:
+    """Return the text of a spoken question. Raises CheckError with a student-safe message."""
+    if not audio:
+        raise CheckError(NOT_HEARD)
+    if len(audio) > MAX_AUDIO_BYTES:
+        raise CheckError("That recording is too long. Please record a shorter question.")
+    key = os.environ.get("ELEVENLABS_API_KEY")
+    if not key:
+        raise CheckError("Voice input is not configured (missing ELEVENLABS_API_KEY).")
+    try:
+        import requests
+
+        r = requests.post(
+            STT_URL,
+            headers={"xi-api-key": key},
+            files={"file": (filename, audio)},
+            data={"model_id": STT_MODEL},
+            timeout=TIMEOUT,
+        )
+        text = r.json().get("text", "").strip() if r.status_code == 200 else ""
+    except Exception as e:  # network, or a reply that is not the expected JSON
+        raise CheckError(NOT_HEARD) from e
+    if not text:
+        raise CheckError(NOT_HEARD)
+    return text
