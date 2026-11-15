@@ -392,30 +392,42 @@ def _generation_config() -> dict:
     return cfg
 
 
-def analyze(claim: str, context: dict, school_key: str, docs: list[dict], language: str, config: Optional[dict] = None) -> _LLMOutput:
-    config = config or load_config()
+def _generate(system: str, prompt: str, schema: dict, thinking: Optional[str] = None) -> str:
+    """One structured-JSON Gemini call. Returns the JSON text; raises CheckError.
+
+    `thinking` overrides the configured thinking level for this call only.
+    """
     key = _api_key()
     from google import genai
 
-    school_name = config["schools"][school_key]["name"]
+    cfg = _generation_config()
+    if thinking:
+        cfg["thinking_level"] = thinking
     try:
         client = genai.Client(api_key=key, http_options={"timeout": REQUEST_TIMEOUT_MS})
         interaction = client.interactions.create(
             model=os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL,
-            input=_build_user_prompt(claim, context, school_name, docs, language),
-            system_instruction=SYSTEM_PROMPT,
-            generation_config=_generation_config(),
-            response_format={
-                "type": "text",
-                "mime_type": "application/json",
-                "schema": _LLMOutput.model_json_schema(),
-            },
+            input=prompt,
+            system_instruction=system,
+            generation_config=cfg,
+            response_format={"type": "text", "mime_type": "application/json", "schema": schema},
         )
         text = interaction.output_text
     except Exception as e:  # network, auth, quota
         raise CheckError(_friendly_api_error(e)) from e
     if not text:  # e.g. the response was blocked
         raise CheckError("We couldn't produce a reliable answer. Please try rephrasing the claim.")
+    return text
+
+
+def analyze(claim: str, context: dict, school_key: str, docs: list[dict], language: str, config: Optional[dict] = None) -> _LLMOutput:
+    config = config or load_config()
+    school_name = config["schools"][school_key]["name"]
+    text = _generate(
+        SYSTEM_PROMPT,
+        _build_user_prompt(claim, context, school_name, docs, language),
+        _LLMOutput.model_json_schema(),
+    )
     try:
         return _LLMOutput.model_validate_json(text)
     except ValidationError as e:

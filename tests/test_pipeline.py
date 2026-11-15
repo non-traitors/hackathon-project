@@ -289,3 +289,24 @@ def test_prompt_includes_todays_date():
 
     prompt = pipeline._build_user_prompt("c", {}, "School", [dict(DOCS[0], scope="federal")], "English")
     assert f"Today's date: {datetime.now(timezone.utc).date().isoformat()}" in prompt
+
+
+def test_analyze_uses_generate(monkeypatch):
+    seen = {}
+
+    def fake(system, prompt, schema, thinking=None):
+        seen.update(system=system, prompt=prompt, schema=schema)
+        return _out("Unclear", []).model_dump_json()
+
+    monkeypatch.setenv("GEMINI_API_KEY", "x")
+    monkeypatch.setattr(pipeline, "_generate", fake, raising=False)
+    out = pipeline.analyze("claim", {}, "msu", DOCS, "English")
+    assert out.verdict == "Unclear"
+    assert seen["system"] == pipeline.SYSTEM_PROMPT and "claim" in seen["prompt"]
+
+
+def test_analyze_bad_json_is_friendly(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "x")
+    monkeypatch.setattr(pipeline, "_generate", lambda *a, **k: "not json", raising=False)
+    with pytest.raises(CheckError, match="reliable answer"):
+        pipeline.analyze("claim", {}, "msu", DOCS, "English")
