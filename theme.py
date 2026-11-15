@@ -11,6 +11,7 @@ the app (tests/test_theme.py checks every text color against WCAG AA).
 """
 from __future__ import annotations
 
+import html
 from typing import Optional
 
 NAVY, BLUE, GRAY = "#1B2F5B", "#0B1FA8", "#5B6B8C"
@@ -43,7 +44,9 @@ STONES = {
 # already on the device.
 SANS = ("'Noto Sans','Noto Sans Arabic','Noto Sans SC','Noto Sans TC',system-ui,-apple-system,"
         "'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif")
-SERIF = ("'Noto Serif','Noto Sans Arabic','Noto Sans SC','Noto Sans TC',Georgia,'Times New Roman',serif")
+# A device serif comes before the Arabic and Chinese faces: those include Latin letters, so
+# they would otherwise turn a headline sans whenever Noto Serif is missing.
+SERIF = ("'Noto Serif',Georgia,'Times New Roman','Noto Sans Arabic','Noto Sans SC','Noto Sans TC',serif")
 FONTS_URL = ("https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;600;700"
              "&family=Noto+Sans+SC:wght@400;600;700&family=Noto+Sans+TC:wght@400;600;700&display=swap")
 LOCAL_FONTS = """
@@ -75,6 +78,14 @@ def stone(kind: Optional[str], size: int) -> str:
     return f'<div class="{cls}" style="--s:{size}px" aria-hidden="true"></div>'
 
 
+def waiting(claim: str, steps: list[str], note: str) -> str:
+    """The waiting screen: the stone with the light inside, the claim, and what happens meanwhile."""
+    rows = "".join(f'<li>{html.escape(step)}</li>' for step in steps)
+    return (f'<div class="stone-wait" role="status">{stone("reading", 176)}'
+            f'<div class="asked">“{html.escape(claim)}”</div>'
+            f'<ul class="stages">{rows}</ul><p class="small">{html.escape(note)}</p></div>')
+
+
 def _stone_css() -> str:
     cleared = "".join(
         f".stone.{kind} {{ background:radial-gradient(circle at 32% 28%, {light} 0%, {body} 46%, {shadow} 88%); }}\n"
@@ -99,7 +110,13 @@ def _stone_css() -> str:
 .stone-row {{ display:flex; align-items:center; gap:14px; margin:.2rem 0 .4rem; }}
 .stone-wait {{ display:flex; flex-direction:column; align-items:center; text-align:center; gap:18px;
   margin:2.2rem 0 1rem; }}
-.stone-wait .asked {{ font-family:{SERIF}; font-size:1.15rem; color:{NAVY}; max-width:22em; }}
+.stone-wait .asked {{ font-family:{SERIF}; font-size:1.35rem; line-height:1.35; color:{NAVY}; max-width:20em; }}
+.stone-wait .stages {{ list-style:none; margin:.6rem 0 0; padding:0; text-align:start; align-self:stretch; }}
+.stone-wait .stages li {{ position:relative; padding-inline-start:1.5rem; margin:.7rem 0; color:{NAVY}; }}
+.stone-wait .stages li::before {{ content:""; position:absolute; inset-inline-start:0; top:.5em; width:10px; height:10px;
+  border-radius:50%; background:{NAVY}; }}
+.hero {{ display:flex; flex-direction:column; align-items:center; text-align:center; gap:14px; margin:.4rem 0 1.2rem; }}
+.hero .lead {{ color:{GRAY}; max-width:21em; margin:0; }}
 """
 
 
@@ -113,7 +130,7 @@ html, body, [class*="css"] {{ font-family:{SANS}; color:{NAVY}; }}
 #MainMenu, footer, header {{ visibility:hidden; }}
 .small {{ font-size:.85rem; color:{GRAY}; }}
 .sr {{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }}
-.block-container h1.title {{ font-family:{SANS}; font-size:2rem; font-weight:700; line-height:1.15;
+.block-container h1.title {{ font-family:{SERIF}; font-size:2rem; font-weight:600; line-height:1.2;
   margin:0; padding:0; color:{NAVY}; }}
 .block-container h1.answer, .block-container h2.answer {{ font-family:{SERIF}; font-size:1.7rem; font-weight:600;
   line-height:1.25; margin:.4rem 0 .6rem; padding:0; color:{NAVY}; }}
@@ -138,4 +155,23 @@ div.stButton > button:focus-visible {{ outline:2px solid {BLUE}; outline-offset:
 div.stButton > button[kind="primary"], div.stButton > button[data-testid="stBaseButton-primary"] {{
   background:{BLUE}; color:white; font-weight:600; padding:.7rem 1rem; }}
 [data-testid="stAudioInput"] button {{ min-width:44px; min-height:44px; }}
+/* The microphone and the main button share one row at every width, as in the design. */
+.st-key-actions [data-testid="stHorizontalBlock"] {{ flex-wrap:nowrap; gap:12px; align-items:stretch; }}
+.st-key-actions [data-testid="stColumn"] {{ min-width:0; }}
+.st-key-actions [data-testid="stColumn"]:first-child {{ flex:0 0 52px; width:52px; }}
+.st-key-actions button {{ min-height:48px; }}
+.st-key-actions div.stButton > button {{ background:{SOFT}; border:0; }}
+.st-key-actions div.stButton > button[kind="primary"], .st-key-actions div.stButton > button[data-testid="stBaseButton-primary"] {{
+  background:{BLUE}; }}
+/* The microphone shows only its icon; its label stays for screen readers. */
+.st-key-mic, .st-key-mic div.stButton {{ width:100%; }}
+.st-key-mic button [data-testid="stMarkdownContainer"] {{ position:absolute; width:1px; height:1px; overflow:hidden;
+  clip:rect(0 0 0 0); white-space:nowrap; }}
+/* School and language share the top row at every width. */
+.st-key-topbar [data-testid="stHorizontalBlock"] {{ flex-wrap:nowrap; gap:10px; }}
+.st-key-topbar [data-testid="stColumn"] {{ min-width:0; }}
+/* Example claims read as full-width rows that wrap, not as centred buttons. */
+.st-key-examples [data-testid="stElementContainer"], .st-key-examples div.stButton {{ width:100%; }}
+.st-key-examples div.stButton > button {{ justify-content:flex-start; text-align:start; padding:.7rem 1rem; }}
+.st-key-examples div.stButton > button p {{ text-align:start; }}
 {_stone_css()}"""

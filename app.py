@@ -13,7 +13,7 @@ import theme
 import ui_adapter
 
 load_dotenv()
-st.set_page_config(page_title="OPT Check", page_icon="🎓")
+st.set_page_config(page_title="Is This Still True?", page_icon="🎓")
 
 # ---------- Settings (edit these) ----------
 # Colors, type and the stone live in theme.py.
@@ -108,10 +108,9 @@ def check_claim(claim, language, school):
 
 
 def run_check(claim, language, school):
-    """Answers for this claim, as a list. Shows progress while it works; raises CheckError."""
+    """Answers for this claim, as a list. Raises CheckError. The agent also shows each step as it happens."""
     if not USE_AGENT:
-        with st.spinner(t("progress")):
-            return [check_claim(claim, language, school)]
+        return [check_claim(claim, language, school)]
     results = []
     with st.status(t("progress"), expanded=True) as status:
         for item in backend.stream(claim, language, school):
@@ -132,10 +131,10 @@ def answers(claim, language, school):
     kept = st.session_state.get("answers")
     if kept and kept[0] == key:
         return kept[1]
-    # While it reads: the stone with the light turning inside it, and what is being checked.
+    # While it reads: the stone with the light turning inside it, the claim, and what happens meanwhile.
     waiting = st.empty()
-    waiting.markdown(f'<div class="stone-wait">{theme.stone("reading", 148)}'
-                     f'<div class="asked">“{esc(claim)}”</div></div>', unsafe_allow_html=True)
+    stages = [t("step_read"), t("step_compare"), t("step_verify")]
+    waiting.markdown(theme.waiting(claim, stages, t("progress")), unsafe_allow_html=True)
     try:
         results = run_check(claim, language, school)
     finally:
@@ -157,45 +156,54 @@ def listen_to_question():
         with st.spinner(t("progress")):
             st.session_state["draft"] = speech.transcribe(audio)[:MAX_CHARS]
         st.session_state["heard_note"] = True
+        st.session_state["recording"] = False  # the transcript is in the box: put the recorder away
     except pipeline.CheckError as e:
         st.error(str(e))
 
 
 # ---------- Screens ----------
 def home():
-    col1, col2 = st.columns([3, 2])
-    st.session_state["language"] = col2.selectbox(
+    with st.container(key="topbar"):
+        school_col, language_col = st.columns([3, 2])
+    st.session_state["language"] = language_col.selectbox(
         langs.ui_text(lang_code(), "language_label"), LANGUAGES, label_visibility="collapsed",
         index=LANGUAGES.index(st.session_state["language"]))
     direction_css()
-    col1.markdown(f'<div class="stone-row">{theme.stone(None, 44)}'
-                  f'<h1 class="title">{esc(t("home_title"))}</h1></div>', unsafe_allow_html=True)
-    st.markdown(f'<span style="color:{theme.GRAY}">{esc(t("home_subtitle"))}</span>', unsafe_allow_html=True)
     schools = list(SCHOOLS)
-    st.session_state["school"] = st.selectbox(
-        t("school_label"), schools, index=schools.index(st.session_state["school"]))
+    st.session_state["school"] = school_col.selectbox(
+        t("school_label"), schools, label_visibility="collapsed", index=schools.index(st.session_state["school"]))
+    st.markdown(f'<div class="hero">{theme.stone(None, 112)}<h1 class="title">{esc(t("app_title"))}</h1>'
+                f'<p class="lead">{esc(t("tagline"))}</p></div>', unsafe_allow_html=True)
     beta_notice()
 
-    st.markdown(f'<div class="label">{esc(t("starters_label"))}</div>', unsafe_allow_html=True)
-    for i, rumor in enumerate(langs.starters(lang_code())):
-        if st.button(f"“{rumor}”", key=f"rumor{i}"):
-            go("result", rumor)
-
-    st.markdown(f'<div class="label">{esc(t("paste_label"))}</div>', unsafe_allow_html=True)
-    typed, spoken = st.container(), st.container()
-    with spoken:  # runs first so a transcript can fill the text box above it
-        if speech.available():
+    asking, recorder = st.container(), st.container()
+    with recorder:  # runs first so a transcript can fill the text box above it
+        if speech.available() and st.session_state.get("recording"):
             listen_to_question()
-    with typed:
+    with asking:
         if st.session_state.get("heard_note"):
             st.markdown(f'<p class="small">{esc(t("we_heard"))}</p>', unsafe_allow_html=True)
-        text = st.text_area(t("paste_label"), key="draft", placeholder=t("placeholder"),
+        text = st.text_area(t("paste_label"), key="draft", placeholder=t("paste_label"),
                             label_visibility="collapsed", max_chars=MAX_CHARS)
-        if st.button(t("check_button"), type="primary", use_container_width=True):
-            if text.strip():
-                go("result", text.strip())
-            st.warning(t("empty_claim"))
+        with st.container(key="actions"):  # microphone and main button side by side
+            if speech.available():
+                mic_col, check_col = st.columns([1, 5])
+                if mic_col.button(t("speak_label"), key="mic", icon=":material/mic:"):
+                    st.session_state["recording"] = not st.session_state.get("recording")
+                    st.rerun()
+            else:
+                check_col = st.container()
+            if check_col.button(t("check_button"), type="primary", use_container_width=True):
+                if text.strip():
+                    go("result", text.strip())
+                st.warning(t("empty_claim"))
         st.markdown(f'<p class="small">🔒 {esc(t("privacy_note"))}</p>', unsafe_allow_html=True)
+
+    st.markdown(f'<div class="label">{esc(t("starters_label"))}</div>', unsafe_allow_html=True)
+    with st.container(key="examples"):
+        for i, rumor in enumerate(langs.starters(lang_code())):
+            if st.button(f"“{rumor}”", key=f"rumor{i}"):
+                go("result", rumor)
 
     st.markdown(f'<p class="small">{esc(t("sources_note"))}</p>' + disclaimer(), unsafe_allow_html=True)
 
@@ -214,7 +222,7 @@ def source_html(s):
 def answer(res, claim, n):
     """Draw one answer: verdict and headline first, then the proof, then what to do next."""
     tag = "h1" if n == 0 else "h2"
-    head = (f'<div role="status" lang="{lang_code()}"><div class="stone-row">{theme.stone(res["pills"][0]["kind"], 44)}'
+    head = (f'<div role="status" lang="{lang_code()}"><div class="stone-row">{theme.stone(res["pills"][0]["kind"], 48)}'
             f'<div>{"".join(pill_html(p) for p in res["pills"])}</div></div>'
             f'<{tag} class="answer">{esc(res["headline"])}</{tag}>')
     if res["explanation"] and res["explanation"] != res["headline"]:
@@ -262,7 +270,7 @@ def answer(res, claim, n):
 def result():
     direction_css()
     if st.button(t("new_check")):
-        for key in ("answers", "draft", "heard_note"):
+        for key in ("answers", "draft", "heard_note", "recording"):
             st.session_state.pop(key, None)
         go("home")
     claim = st.session_state["claim"]

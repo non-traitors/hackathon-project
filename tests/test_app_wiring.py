@@ -47,12 +47,25 @@ def _open(monkeypatch, result=None, seen=None, language=None):
     monkeypatch.setattr(pipeline, "check_claim", fake)
     at = AppTest.from_file(APP, default_timeout=30).run()
     if language:
-        at.selectbox[0].set_value(language).run()
+        _language(at).set_value(language).run()
     return at
 
 
 def _html(at):
     return " ".join(m.value for m in at.markdown)
+
+
+def _language(at):
+    return next(b for b in at.selectbox if "English" in b.options)
+
+
+def _school(at):
+    return next(b for b in at.selectbox if "English" not in b.options)
+
+
+def _starters(at):
+    """The example claims: the buttons whose label is a quoted claim."""
+    return [b for b in at.button if b.label.startswith("“")]
 
 
 def esc(text):
@@ -61,24 +74,24 @@ def esc(text):
 
 
 def _check_first_starter(at):
-    at.button[0].click().run()
+    _starters(at)[0].click().run()
     return at
 
 
 def test_language_picker_lists_exactly_the_five_languages_in_the_frontends_wording():
     at = AppTest.from_file(APP, default_timeout=30).run()
-    assert at.selectbox[0].options == FRONTEND_LABELS == list(langs.language_choices().values())
+    assert _language(at).options == FRONTEND_LABELS == list(langs.language_choices().values())
 
 
 @pytest.mark.parametrize("label", FRONTEND_LABELS)
 def test_home_renders_in_each_language_with_its_own_text_and_starters(label):
     at = AppTest.from_file(APP, default_timeout=30).run()
-    at.selectbox[0].set_value(label).run()
+    _language(at).set_value(label).run()
     code = langs.resolve_language(label, strict=True)
     assert not at.exception
     html = _html(at)
-    assert langs.ui_text(code, "home_title") in html and langs.ui_text(code, "starters_label") in html
-    assert [b.label.strip("“”") for b in at.button[:5]] == langs.starters(code)
+    assert esc(langs.ui_text(code, "app_title")) in html and langs.ui_text(code, "starters_label") in html
+    assert [b.label.strip("“”") for b in _starters(at)] == langs.starters(code)
     assert (langs.ui_text(code, "beta") in html) == (not langs.is_reviewed(code))
 
 
@@ -94,7 +107,7 @@ def test_backend_receives_school_key_and_the_label_the_user_picked(monkeypatch):
 def test_other_school_is_passed_as_its_key(monkeypatch):
     seen = {}
     at = _open(monkeypatch, seen=seen)
-    at.selectbox[1].set_value("University of Chicago").run()
+    _school(at).set_value("University of Chicago").run()
     _check_first_starter(at)
     assert seen["school"] == "uchicago"
 

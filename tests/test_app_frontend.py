@@ -53,18 +53,23 @@ def _button(at, label):
     return next(b for b in at.button if b.label == label)
 
 
+def _starter(at):
+    """The first example claim on the home screen."""
+    return next(b for b in at.button if b.label.startswith("“"))
+
+
 def _printed(at):
     return [e.value.strip() for e in list(at.markdown) + list(at.code)]
 
 
 def test_no_stray_none_is_printed_on_either_screen(app):
     assert "None" not in _printed(app)
-    app.button[0].click().run()
+    _starter(app).click().run()
     assert not app.exception and "None" not in _printed(app)
 
 
 def test_answer_comes_before_the_students_own_question(app):
-    app.button[0].click().run()
+    _starter(app).click().run()
     html = _html(app)
     assert html.index("No: 20 hours during the semester.") < html.index(pipeline_starter())
 
@@ -76,20 +81,20 @@ def pipeline_starter():
 
 
 def test_quote_is_shown_before_the_source_details(app):
-    app.button[0].click().run()
+    _starter(app).click().run()
     html = _html(app)
     assert html.index('class="quote">you may not work') < html.index("Working in the United States")
 
 
 def test_source_title_is_a_link_to_the_official_page(app):
-    app.button[0].click().run()
+    _starter(app).click().run()
     assert 'href="https://studyinthestates.dhs.gov/work"' in _html(app)
 
 
 def test_rerun_on_the_result_screen_does_not_check_again(app, monkeypatch):
     monkeypatch.setattr(speech, "available", lambda: True)
     monkeypatch.setattr(speech, "speak", lambda text: b"MP3")
-    app.button[0].click().run()
+    _starter(app).click().run()
     assert len(app.calls) == 1
     _button(app, "Listen").click().run()
     assert not app.exception and len(app.calls) == 1
@@ -99,7 +104,7 @@ def test_listen_reads_the_verdict_and_explanation(app, monkeypatch):
     said = []
     monkeypatch.setattr(speech, "available", lambda: True)
     monkeypatch.setattr(speech, "speak", lambda text: said.append(text) or b"MP3")
-    app.button[0].click().run()
+    _starter(app).click().run()
     _button(app, "Listen").click().run()
     assert said == ["Contradicted. Federal and MSU rules."]
 
@@ -110,14 +115,14 @@ def test_listen_failure_shows_a_message_and_keeps_the_answer(app, monkeypatch):
 
     monkeypatch.setattr(speech, "available", lambda: True)
     monkeypatch.setattr(speech, "speak", down)
-    app.button[0].click().run()
+    _starter(app).click().run()
     _button(app, "Listen").click().run()
     assert not app.exception and any(speech.FAILED in e.value for e in app.error)
     assert "No: 20 hours during the semester." in _html(app)
 
 
 def test_no_listen_button_without_a_voice_key(app):
-    app.button[0].click().run()
+    _starter(app).click().run()
     assert all(b.label != "Listen" for b in app.button)
 
 
@@ -136,7 +141,7 @@ def test_agent_mode_shows_steps_and_one_answer_per_claim(monkeypatch):
     monkeypatch.setattr(speech, "available", lambda: False)
     monkeypatch.setenv("USE_AGENT", "1")
     at = AppTest.from_file(APP, default_timeout=30).run()
-    at.button[0].click().run()
+    _starter(at).click().run()
     html = _html(at)
     assert not at.exception
     assert "First answer." in html and "Second answer." in html
@@ -154,7 +159,7 @@ def test_agent_mode_errors_are_friendly(monkeypatch):
     monkeypatch.setattr(speech, "available", lambda: False)
     monkeypatch.setenv("USE_AGENT", "1")
     at = AppTest.from_file(APP, default_timeout=30).run()
-    at.button[0].click().run()
+    _starter(at).click().run()
     assert not at.exception and any("usage limit" in e.value for e in at.error)
 
 
@@ -164,36 +169,36 @@ def test_home_has_a_page_heading_and_real_labels(app):
 
     assert "<h1" in _html(app)
     assert app.text_area[0].label == langs.ui_text("en", "paste_label")
-    assert app.selectbox[0].label == langs.ui_text("en", "language_label")
+    assert {b.label for b in app.selectbox} == {langs.ui_text("en", "language_label"), langs.ui_text("en", "school_label")}
 
 
 def test_answer_is_a_heading_announced_when_it_arrives(app):
-    app.button[0].click().run()
+    _starter(app).click().run()
     html = _html(app)
     assert 'role="status"' in html and '<h1 class="answer">No: 20 hours during the semester.' in html
 
 
 def test_quote_is_marked_as_english_inside_any_language(app):
-    app.button[0].click().run()
+    _starter(app).click().run()
     assert '<div class="qwrap" lang="en">' in _html(app)
 
 
 def test_source_link_says_it_opens_a_new_tab(app):
     import languages as langs
 
-    app.button[0].click().run()
+    _starter(app).click().run()
     assert langs.ui_text("en", "new_tab") in _html(app)
 
 
 def test_answer_carries_a_stone_in_the_verdict_color(app):
     assert 'class="stone"' in _html(app)  # the mark on the home screen
-    app.button[0].click().run()
+    _starter(app).click().run()
     assert 'class="stone contradicted"' in _html(app)
 
 
 def test_answer_says_when_it_was_checked(monkeypatch, app):
     monkeypatch.setattr(pipeline, "check_claim", lambda *a: _result(checked_at="2026-11-14T23:41:07+00:00"))
-    app.button[0].click().run()
+    _starter(app).click().run()
     assert "Checked 2026-11-14 23:41 UTC" in _html(app)
 
 
@@ -219,7 +224,7 @@ def test_error_offers_try_again_and_trying_again_checks_again(monkeypatch):
     monkeypatch.setattr(speech, "available", lambda: False)
     monkeypatch.delenv("USE_AGENT", raising=False)
     at = AppTest.from_file(APP, default_timeout=30).run()
-    at.button[0].click().run()
+    _starter(at).click().run()
     assert any("usage limit" in e.value for e in at.error)
     _button(at, "Try again").click().run()
     assert not at.exception and len(calls) == 2 and "No: 20 hours during the semester." in _html(at)
@@ -242,6 +247,8 @@ def test_spoken_question_is_shown_for_correction_before_any_check(monkeypatch):
     monkeypatch.setattr(st, "audio_input", lambda *a, **k: Recording())
     monkeypatch.delenv("USE_AGENT", raising=False)
     at = AppTest.from_file(APP, default_timeout=30).run()
+    assert at.text_area[0].value == ""  # nothing is recorded until the microphone is pressed
+    at.button(key="mic").click().run()
     assert not at.exception and calls == []
     assert at.text_area[0].value == "Is OPT cancelled"
     assert langs.ui_text("en", "we_heard") in _html(at)
@@ -264,5 +271,27 @@ def test_unheard_recording_shows_the_message_and_keeps_the_home_screen(monkeypat
     monkeypatch.setattr(speech, "transcribe", unheard)
     monkeypatch.setattr(st, "audio_input", lambda *a, **k: Recording())
     at = AppTest.from_file(APP, default_timeout=30).run()
+    at.button(key="mic").click().run()
     assert not at.exception and any(speech.NOT_HEARD in e.value for e in at.error)
     assert len(at.button) >= 6  # starters and Check it are still there
+
+
+# ------------------------------------------------------- matches the Figma design
+def test_home_leads_with_the_stone_the_question_and_the_tagline(app):
+    import html as htmllib
+
+    import languages as langs
+
+    page = _html(app)
+    title = htmllib.escape(langs.ui_text("en", "app_title"))
+    assert f'<h1 class="title">{title}</h1>' in page and langs.ui_text("en", "tagline") in page
+    assert page.index('class="stone"') < page.index(title)
+
+
+def test_check_button_comes_before_the_examples(app):
+    labels = [b.label for b in app.button]
+    assert labels.index("Check it") < labels.index(_starter(app).label)
+
+
+def test_no_microphone_without_a_voice_key(app):
+    assert all(b.key != "mic" for b in app.button)

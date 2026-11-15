@@ -72,6 +72,9 @@ languages:
       we_heard: 'We heard this. Fix anything that is wrong, then check it.'
       new_tab: 'opens in a new tab'
       checked_at: 'Checked {when}'
+      step_read: 'Reading the official pages for your school'
+      step_compare: 'Comparing your claim with what they say'
+      step_verify: 'Checking every quote against the page text'
     glossary: {}
     keywords: {}
 
@@ -128,6 +131,9 @@ languages:
       we_heard: 'هذا ما سمعناه. صحّح أي خطأ ثم اضغط للتحقق.'
       new_tab: 'يفتح في علامة تبويب جديدة'
       checked_at: 'تم التحقق في {when}'
+      step_read: 'قراءة الصفحات الرسمية الخاصة بجامعتك'
+      step_compare: 'مقارنة ادعائك بما تقوله هذه الصفحات'
+      step_verify: 'التحقق من كل اقتباس مقابل نص الصفحة'
     glossary:
       OPT: التدريب العملي الاختياري (OPT)
       STEM OPT: تمديد التدريب العملي لتخصصات STEM (STEM OPT)
@@ -201,6 +207,9 @@ languages:
       we_heard: '这是我们听到的内容。请改正错误，然后开始核实。'
       new_tab: '在新标签页中打开'
       checked_at: '核实时间：{when}'
+      step_read: '正在阅读与你学校相关的官方页面'
+      step_compare: '正在把你的说法与页面内容对照'
+      step_verify: '正在逐句核对引文与页面原文'
     glossary:
       OPT: 选择性实习培训（OPT）
       STEM OPT: STEM OPT延期（24个月）
@@ -274,6 +283,9 @@ languages:
       we_heard: '這是我們聽到的內容。請改正錯誤，然後開始核實。'
       new_tab: '在新分頁開啟'
       checked_at: '核實時間：{when}'
+      step_read: '正在閱讀與你學校相關的官方頁面'
+      step_compare: '正在把你的說法與頁面內容對照'
+      step_verify: '正在逐句核對引文與頁面原文'
     glossary:
       OPT: 選擇性實習培訓（OPT）
       STEM OPT: STEM OPT延期（24個月）
@@ -347,6 +359,9 @@ languages:
       we_heard: 'Вот что мы услышали. Исправьте ошибки и нажмите «Проверить».'
       new_tab: 'откроется в новой вкладке'
       checked_at: 'Проверено: {when}'
+      step_read: 'Читаем официальные страницы вашего вуза'
+      step_compare: 'Сравниваем ваше утверждение с их текстом'
+      step_verify: 'Сверяем каждую цитату с текстом страницы'
     glossary:
       OPT: Опциональная практическая подготовка (OPT)
       STEM OPT: Продление OPT для STEM-специальностей (STEM OPT)

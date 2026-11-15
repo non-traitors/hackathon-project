@@ -44,3 +44,16 @@ def test_latin_fonts_are_bundled_so_the_demo_does_not_depend_on_the_network():
         assert f"app/static/fonts/{name}" in css and (root / "static" / "fonts" / name).stat().st_size > 10_000
     assert "family=Noto+Sans:" not in theme.FONTS_URL and "family=Noto+Serif" not in theme.FONTS_URL
     assert "enableStaticServing = true" in (root / ".streamlit" / "config.toml").read_text()
+
+
+def test_waiting_view_announces_itself_and_lists_what_happens():
+    html = theme.waiting("OPT now costs $70,000 <b>", ["Reading the official pages", "Checking every quote"], "About 10 to 25 seconds.")
+    assert 'role="status"' in html and 'class="stone reading"' in html
+    assert "OPT now costs $70,000 &lt;b&gt;" in html  # the claim is escaped
+    assert html.index("Reading the official pages") < html.index("Checking every quote") < html.index("About 10 to 25 seconds.")
+
+
+def test_serif_falls_back_to_a_serif_before_any_sans_face():
+    """If Noto Serif fails to load, the headline must not drop to Noto Sans Arabic, which has Latin letters."""
+    stack = theme.SERIF
+    assert stack.index("Georgia") < stack.index("Noto Sans Arabic")
