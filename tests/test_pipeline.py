@@ -370,3 +370,8 @@ def test_page_title_is_the_first_title_only():
               "<p>Text.</p><title>Employment | OISS</title></body></html>")
     title, text = pipeline.html_to_text(markup)
     assert title == "Employment | OISS" and text == "Text."
+
+
+def test_a_stuck_model_call_gives_up_within_45_seconds():
+    """A student should not stare at a spinner for a minute before seeing an error."""
+    assert pipeline.REQUEST_TIMEOUT_MS <= 45_000

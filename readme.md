@@ -191,6 +191,8 @@ hackathon-project/
 ├── agent.py           # Bounded agent: plans what to read, follows official links, verifies quotes
 ├── backend.py         # Runs the agent for a frontend: results via ui_adapter plus a live step stream
 ├── speech.py          # Voice in (speech to text) and voice out (text to speech) with ElevenLabs
+├── theme.py           # The look: colors, type, styles and the stone (contrast is tested)
+├── static/fonts/      # Bundled Noto Sans and Noto Serif (Latin), SIL Open Font License
 ├── languages.py       # Loads the language registry
 ├── languages.yaml     # Languages: UI strings, glossary, routing keywords, starter claims (non-English drafts)
 ├── ui_adapter.py      # Turns a result into plain data any frontend can draw

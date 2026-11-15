@@ -37,13 +37,21 @@ STONES = {
     "blocked": ("#F6C1BC", "#B3261E", "#5E120D"),
 }
 
-# Web fonts first, then fonts already on the device, so a weak connection still reads well.
+# Latin text uses Noto Sans and Noto Serif from static/fonts (bundled, SIL Open Font
+# License), so the interface looks right with no network. Arabic and Chinese faces
+# are too large to bundle: they load from Google Fonts, and fall back to the fonts
+# already on the device.
 SANS = ("'Noto Sans','Noto Sans Arabic','Noto Sans SC','Noto Sans TC',system-ui,-apple-system,"
         "'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif")
 SERIF = ("'Noto Serif','Noto Sans Arabic','Noto Sans SC','Noto Sans TC',Georgia,'Times New Roman',serif")
-FONTS_URL = ("https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&family=Noto+Serif:wght@400;600"
-             "&family=Noto+Sans+Arabic:wght@400;600;700&family=Noto+Sans+SC:wght@400;600;700"
-             "&family=Noto+Sans+TC:wght@400;600;700&display=swap")
+FONTS_URL = ("https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;600;700"
+             "&family=Noto+Sans+SC:wght@400;600;700&family=Noto+Sans+TC:wght@400;600;700&display=swap")
+LOCAL_FONTS = """
+@font-face { font-family:'Noto Sans'; font-style:normal; font-weight:400 700; font-display:swap;
+  src:url('app/static/fonts/noto-sans-latin.woff2') format('woff2'); }
+@font-face { font-family:'Noto Serif'; font-style:normal; font-weight:400 600; font-display:swap;
+  src:url('app/static/fonts/noto-serif-latin.woff2') format('woff2'); }
+"""
 
 
 def _luminance(hex_color: str) -> float:
@@ -99,6 +107,7 @@ def css() -> str:
     """The stylesheet for the whole app."""
     return f"""
 @import url('{FONTS_URL}');
+{LOCAL_FONTS}
 html, body, [class*="css"] {{ font-family:{SANS}; color:{NAVY}; }}
 .block-container {{ max-width:480px; padding-top:1.5rem; }}
 #MainMenu, footer, header {{ visibility:hidden; }}
