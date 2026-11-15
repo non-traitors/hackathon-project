@@ -1,7 +1,7 @@
 import html
 import streamlit as st
 
-st.set_page_config(page_title="OPT check", page_icon="🎓")
+st.set_page_config(page_title="OPT Check", page_icon="🎓")
 
 # ---------- Settings (edit these) ----------
 NAVY, BLUE, GRAY = "#1B2F5B", "#0B1FA8", "#5B6B8C"
