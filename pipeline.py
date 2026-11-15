@@ -323,10 +323,13 @@ exceptions in exceptions. If the claim is true in the usual situation but fails 
 exceptions, answer Supported and list them. Use Unclear only when the documents are \
 insufficient, conflicting, or outdated, or when the claim cannot be judged without a \
 fact about the student that no usual case settles (for example which visa they hold).
+- Today's date is given. Describe dates relative to it: a rule whose effective date \
+is before today is in effect now, not "scheduled" or "upcoming"; one after today is \
+upcoming.
 - rule_status is for rumors about a rule changing. Use "Proposed only" only if a \
 document says a rule was proposed but not finalized, "Blocked" only if a document \
 says it was blocked or stayed by a court, "In effect" only if a document says it is \
-in effect, otherwise "Not applicable". Never infer these from your own knowledge.
+in effect or gives an effective date before today, otherwise "Not applicable". Never infer these from your own knowledge.
 - Most claims are true for some students and false for others. State who the claim \
 applies to in applies_to and what changes the answer in exceptions.
 - Distinguish federal rules from university-specific policy, and never present one \
@@ -356,8 +359,9 @@ def _build_user_prompt(claim: str, context: dict, school_name: str, docs: list[d
         f"Text:\n{d.get('view', d['text'])}"
         for i, d in enumerate(docs)
     )
+    today = datetime.now(timezone.utc).date().isoformat()
     return (
-        f"Claim: {claim}\nSchool: {school_name}\nStudent context: {ctx}\n"
+        f"Today's date: {today}\nClaim: {claim}\nSchool: {school_name}\nStudent context: {ctx}\n"
         f"Answer language: {language}\n\n{blocks}"
     )
 

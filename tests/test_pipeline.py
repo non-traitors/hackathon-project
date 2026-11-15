@@ -282,3 +282,10 @@ def test_api_errors_get_actionable_messages():
 
 def test_default_thinking_is_a_valid_level():
     assert pipeline.DEFAULT_THINKING in ("", "minimal", "low", "medium", "high", "xhigh")
+
+
+def test_prompt_includes_todays_date():
+    from datetime import datetime, timezone
+
+    prompt = pipeline._build_user_prompt("c", {}, "School", [dict(DOCS[0], scope="federal")], "English")
+    assert f"Today's date: {datetime.now(timezone.utc).date().isoformat()}" in prompt
