@@ -54,6 +54,22 @@ Verdict + explanation + source links
 
 The verdict labels will stay in English across languages. The explanation will use the selected language.
 
+### Agent mode
+
+`agent.py` adds a bounded agent on top of the single-pass check. It is implemented and covered by offline tests; **it has not been run against the live Gemini API yet**, so its accuracy and speed are unmeasured (`tests/live_golden.py` has the live cases, run with `-k agent`).
+
+For each claim the agent works in visible steps:
+
+1. **Split.** A pasted group-chat message becomes up to 3 separate claims. A short one-line claim skips this step.
+2. **Plan.** Gemini chooses which curated official pages to read (at most 4) and gives English search terms, so claims written in other languages still find the right passages.
+3. **Read.** The app fetches those pages and collects the links on them that stay inside the allowlist.
+4. **Judge.** Gemini either answers, or asks to read up to 2 more pages from the links and catalog it was shown. At most 2 such rounds.
+5. **Verify.** The same rule as before: every quote must appear word for word in a page the app fetched, or the verdict drops to **Unclear**.
+
+What the agent may decide is what to read. What it may not decide is the answer without a verified quote. The limits are fixed in code: 8 pages, 4 model calls and 45 seconds per claim, and the model can only open URLs it was shown. If any step fails, the claim is handed to the single-pass check in `pipeline.py`, and the trace says so.
+
+`backend.py` exposes this to the interface as `check_claim(claim, language, school)`, in the same shape as the placeholder in `app.py`, and as `stream(...)`, which also yields each step for a live progress display.
+
 ## MVP scope
 
 - [ ] Claim input and answer-language selector.
@@ -156,7 +172,9 @@ hackathon-project/
 ├── readme.md          # Project overview and implementation plan
 ├── app.py             # Streamlit interface (placeholder result, not yet connected)
 ├── app_prototype.py   # Standalone interface wired to the backend
-├── pipeline.py        # Fetch official pages, call Gemini, verify citations
+├── pipeline.py        # Fetch official pages, call Gemini, verify citations (single-pass check)
+├── agent.py           # Bounded agent: plans what to read, follows official links, verifies quotes
+├── backend.py         # Bridge for app.py: check_claim(claim, language, school) and a live step stream
 ├── sources.yaml       # Allowlist, topic keywords, curated source pages
 ├── requirements.txt   # Python dependencies
 ├── .env.example       # Configuration template with no real keys (GEMINI_API_KEY, optional model and thinking level)
@@ -221,3 +239,12 @@ The planned notice under each result is:
 > This is not legal advice. Confirm with your school's international student office before acting (the app names it).
 
 Students at other institutions should confirm with their own international student office. Users should enter the claim they want checked without including passport numbers, immigration document numbers, or other sensitive personal details.
+
+## AI tools used
+
+The hackathon rules ask teams to say which AI tools they used and how.
+
+- **Gemini API** is part of the product: it reads the fetched official pages and writes the explanation.
+- **Claude Code** was used to audit the repository and to write `agent.py`, `backend.py` and their tests, from a design and plan the team reviewed (`docs/superpowers/`).
+- **ChatGPT** was used for the original project discussion linked at the top of this file.
+- _Team: add any other tools used for the pipeline, the interface or the design here before submitting._
