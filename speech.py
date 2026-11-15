@@ -3,9 +3,12 @@
     text = speech.transcribe(recording.getvalue())   # the student's spoken question, as text
     audio = speech.speak(speech.script(result))      # MP3 bytes, e.g. for st.audio(audio, format="audio/mp3")
 
-Both models detect the language themselves, so the same calls work for English,
-Arabic, Mandarin, Cantonese or Russian. A transcript is plain text: it goes through the
-agent's scope gate and quote check like anything typed.
+Both models can detect the language themselves, but Cantonese and Mandarin are both
+"Chinese" to a detector, so callers should pass `language` (a registry code or a picker
+name such as 繁體中文). The registry maps it to ElevenLabs' own codes (languages.yaml):
+Cantonese is `yue`, Mandarin is `zho` / `zh`. If ElevenLabs rejects a code, the call is
+repeated once without it, which is the old auto-detect behavior. A transcript is plain
+text: it goes through the agent's scope gate and quote check like anything typed.
 
 What leaves the machine: the answer text (for speak) and, only when the student
 chooses to speak, their recording (for transcribe).
@@ -14,7 +17,9 @@ from __future__ import annotations
 
 import os
 import re
+from typing import Optional
 
+import languages as langs
 from pipeline import CheckError
 
 API_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice}"
@@ -29,7 +34,7 @@ CACHE_SIZE = 32
 FAILED = "We couldn't read this aloud right now. The written answer is unchanged."
 NOT_HEARD = "We couldn't make out the recording. Please try again, or type your question."
 
-_cache: dict[tuple[str, str, str], bytes] = {}
+_cache: dict[tuple, bytes] = {}
 
 
 def clear_cache() -> None:
@@ -55,11 +60,17 @@ def script(result: dict) -> str:
     """What to read for one result dict from ui_adapter.to_ui: the verdict, then the explanation."""
     if result.get("out_of_scope"):
         return result["explanation"]
-    return f"{result['verdict']}. {result['explanation']}"
+    # The verdict word is read in the answer language when the adapter provides it.
+    verdict = result.get("verdict_text") or result["verdict"]
+    return f"{verdict}. {result['explanation']}"
 
 
-def speak(text: str) -> bytes:
-    """Return MP3 audio of `text`. Raises CheckError with a message safe to show the student."""
+def speak(text: str, language: Optional[str] = None) -> bytes:
+    """Return MP3 audio of `text`. Raises CheckError with a message safe to show the student.
+
+    `language` is the language the text is written in; it is sent to ElevenLabs as
+    `language_code` (Cantonese is `yue`) so the text is read in that language.
+    """
     text = _trim(text or "")
     if not text:
         raise CheckError("There is nothing to read aloud.")
@@ -68,30 +79,45 @@ def speak(text: str) -> bytes:
         raise CheckError("Read-aloud is not configured (missing ELEVENLABS_API_KEY).")
     voice = os.environ.get("ELEVENLABS_VOICE_ID") or DEFAULT_VOICE
     model = os.environ.get("ELEVENLABS_MODEL") or DEFAULT_MODEL
-    cache_key = (text, voice, model)
+    lang = langs.speech_code(language, "tts") if language else None
+    cache_key = (text, voice, model, lang)
     if cache_key in _cache:
         return _cache[cache_key]
-    try:
-        import requests
+    audio = None
+    # With a language code first; if that fails for any reason, once more without it.
+    for code in ([lang, None] if lang else [None]):
+        body = {"text": text, "model_id": model}
+        if code:
+            body["language_code"] = code
+        try:
+            import requests
 
-        r = requests.post(
-            API_URL.format(voice=voice),
-            headers={"xi-api-key": key, "accept": "audio/mpeg"},
-            json={"text": text, "model_id": model},
-            timeout=TIMEOUT,
-        )
-    except Exception as e:  # network
-        raise CheckError(FAILED) from e
-    if r.status_code != 200 or not r.content:  # bad key, quota, unknown voice, empty body
+            r = requests.post(
+                API_URL.format(voice=voice),
+                headers={"xi-api-key": key, "accept": "audio/mpeg"},
+                json=body,
+                timeout=TIMEOUT,
+            )
+        except Exception:  # network
+            continue
+        if r.status_code == 200 and r.content:  # else: bad key, quota, unknown voice, empty body
+            audio = r.content
+            break
+    if audio is None:
         raise CheckError(FAILED)
     if len(_cache) >= CACHE_SIZE:
         _cache.pop(next(iter(_cache)))
-    _cache[cache_key] = r.content
-    return r.content
+    _cache[cache_key] = audio
+    return audio
 
 
-def transcribe(audio: bytes, filename: str = "question.wav") -> str:
-    """Return the text of a spoken question. Raises CheckError with a student-safe message."""
+def transcribe(audio: bytes, filename: str = "question.wav", language: Optional[str] = None) -> str:
+    """Return the text of a spoken question. Raises CheckError with a student-safe message.
+
+    `language` is the language the student is expected to speak. It is sent as
+    `language_code` (Cantonese is `yue`) so Cantonese is not heard as Mandarin. Without
+    it, ElevenLabs detects the language.
+    """
     if not audio:
         raise CheckError(NOT_HEARD)
     if len(audio) > MAX_AUDIO_BYTES:
@@ -99,19 +125,20 @@ def transcribe(audio: bytes, filename: str = "question.wav") -> str:
     key = os.environ.get("ELEVENLABS_API_KEY")
     if not key:
         raise CheckError("Voice input is not configured (missing ELEVENLABS_API_KEY).")
-    try:
-        import requests
+    lang = langs.speech_code(language, "stt") if language else None
+    # With the expected language first; if that fails or hears nothing, once more
+    # with auto-detect (the student may have spoken a different language).
+    for code in ([lang, None] if lang else [None]):
+        data = {"model_id": STT_MODEL}
+        if code:
+            data["language_code"] = code
+        try:
+            import requests
 
-        r = requests.post(
-            STT_URL,
-            headers={"xi-api-key": key},
-            files={"file": (filename, audio)},
-            data={"model_id": STT_MODEL},
-            timeout=TIMEOUT,
-        )
-        text = r.json().get("text", "").strip() if r.status_code == 200 else ""
-    except Exception as e:  # network, or a reply that is not the expected JSON
-        raise CheckError(NOT_HEARD) from e
-    if not text:
-        raise CheckError(NOT_HEARD)
-    return text
+            r = requests.post(STT_URL, headers={"xi-api-key": key}, files={"file": (filename, audio)}, data=data, timeout=TIMEOUT)
+            text = r.json().get("text", "").strip() if r.status_code == 200 else ""
+        except Exception:  # network, or a reply that is not the expected JSON
+            text = ""
+        if text:
+            return text
+    raise CheckError(NOT_HEARD)

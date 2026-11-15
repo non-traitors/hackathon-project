@@ -71,6 +71,7 @@ def to_ui(result: pipeline.CheckResult, school_key: str, config: Optional[dict] 
     office = office_for(school_key, config)
     return {
         "verdict": result.verdict,
+        "verdict_text": langs.verdict_label(code, result.verdict),  # the word in the answer language
         "pills": pills,
         "headline": result.headline or result.explanation,
         "explanation": result.explanation,

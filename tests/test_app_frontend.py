@@ -93,7 +93,7 @@ def test_source_title_is_a_link_to_the_official_page(app):
 
 def test_rerun_on_the_result_screen_does_not_check_again(app, monkeypatch):
     monkeypatch.setattr(speech, "available", lambda: True)
-    monkeypatch.setattr(speech, "speak", lambda text: b"MP3")
+    monkeypatch.setattr(speech, "speak", lambda text, language=None: b"MP3")
     _starter(app).click().run()
     assert len(app.calls) == 1
     _button(app, "Listen").click().run()
@@ -103,14 +103,14 @@ def test_rerun_on_the_result_screen_does_not_check_again(app, monkeypatch):
 def test_listen_reads_the_verdict_and_explanation(app, monkeypatch):
     said = []
     monkeypatch.setattr(speech, "available", lambda: True)
-    monkeypatch.setattr(speech, "speak", lambda text: said.append(text) or b"MP3")
+    monkeypatch.setattr(speech, "speak", lambda text, language=None: said.append(text) or b"MP3")
     _starter(app).click().run()
     _button(app, "Listen").click().run()
     assert said == ["Contradicted. Federal and MSU rules."]
 
 
 def test_listen_failure_shows_a_message_and_keeps_the_answer(app, monkeypatch):
-    def down(text):
+    def down(text, language=None):
         raise pipeline.CheckError(speech.FAILED)
 
     monkeypatch.setattr(speech, "available", lambda: True)
@@ -243,7 +243,7 @@ def test_spoken_question_is_shown_for_correction_before_any_check(monkeypatch):
     monkeypatch.setattr(pipeline, "warm_pages", lambda *a, **k: 0)
     monkeypatch.setattr(pipeline, "check_claim", lambda *a: calls.append(a) or _result())
     monkeypatch.setattr(speech, "available", lambda: True)
-    monkeypatch.setattr(speech, "transcribe", lambda audio: "Is OPT cancelled")
+    monkeypatch.setattr(speech, "transcribe", lambda audio, language=None: "Is OPT cancelled")
     monkeypatch.setattr(st, "audio_input", lambda *a, **k: Recording())
     monkeypatch.delenv("USE_AGENT", raising=False)
     at = AppTest.from_file(APP, default_timeout=30).run()
@@ -265,7 +265,7 @@ def test_unheard_recording_shows_the_message_and_keeps_the_home_screen(monkeypat
         def getvalue(self):
             return b"RIFFdata"
 
-    def unheard(audio):
+    def unheard(audio, language=None):
         raise pipeline.CheckError(speech.NOT_HEARD)
 
     monkeypatch.setattr(pipeline, "warm_pages", lambda *a, **k: 0)
@@ -309,7 +309,7 @@ def _how(code):
     return htmllib.escape(langs.ui_text(code, "speak_how"))
 
 
-def _voice_app(monkeypatch, recording=b"RIFFdata", transcribe=lambda audio: "Is OPT cancelled"):
+def _voice_app(monkeypatch, recording=b"RIFFdata", transcribe=lambda audio, language=None: "Is OPT cancelled"):
     """The app with a voice key. `at.recorder` lists every time the recorder was drawn."""
     import streamlit as st
 
@@ -357,7 +357,7 @@ def test_recorder_closes_once_the_transcript_is_in_the_box(monkeypatch):
 def test_spoken_words_are_added_to_what_was_already_typed(monkeypatch):
     at = _voice_app(monkeypatch, recording=None)
     at.text_area[0].set_value("My friend said this:").run()
-    monkeypatch.setattr(speech, "transcribe", lambda audio: "OPT is cancelled")
+    monkeypatch.setattr(speech, "transcribe", lambda audio, language=None: "OPT is cancelled")
     import streamlit as st
 
     class Recording:
@@ -392,7 +392,7 @@ def test_writing_down_a_recording_does_not_claim_to_read_official_sources(monkey
 def test_unheard_recording_is_explained_in_the_chosen_language(monkeypatch):
     import languages as langs
 
-    def unheard(audio):
+    def unheard(audio, language=None):
         raise pipeline.CheckError(speech.NOT_HEARD)
 
     at = _voice_app(monkeypatch, transcribe=unheard)
