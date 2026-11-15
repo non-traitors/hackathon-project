@@ -88,3 +88,9 @@ schools:
         - https://internationalaffairs.uchicago.edu/students/current-students/optional-practical-training
       stem_opt:
         - https://internationalaffairs.uchicago.edu/students/current-students/stem-opt-extension
+
+# Topics we have no sources for. A claim that is ONLY about one of these (no in-scope
+# topic also matches) gets an instant "outside what we can check" answer, with no
+# model call. Words from every supported language are listed here.
+out_of_scope:
+  banking: [bank, banking, "credit card", "credit score", loan, mortgage, zelle, venmo, "debit card", "checking account", "savings account", بنك, 银行, 銀行]

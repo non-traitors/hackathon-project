@@ -22,6 +22,8 @@ DOCS = [
 def _out(verdict, sources):
     return _LLMOutput(
         verdict=verdict,
+        headline="",
+        claim_in_english="",
         rule_status="Not applicable",
         explanation="x",
         applies_to=[],
@@ -34,19 +36,19 @@ def _out(verdict, sources):
 
 
 def test_valid_citation_kept():
-    out = _out("Contradicted", [_LLMSource(url=DOCS[0]["url"], quote="up to 20 hours per week")])
+    out = _out("Contradicted", [_LLMSource(url=DOCS[0]["url"], quote="up to 20 hours per week", quote_translation="")])
     sources, verdict = validate_output(out, DOCS)
     assert verdict == "Contradicted" and len(sources) == 1 and sources[0].date is None
 
 
 def test_invented_url_dropped_and_verdict_downgraded():
-    out = _out("Supported", [_LLMSource(url="https://example.com/fake", quote="anything")])
+    out = _out("Supported", [_LLMSource(url="https://example.com/fake", quote="anything", quote_translation="")])
     sources, verdict = validate_output(out, DOCS)
     assert sources == [] and verdict == "Unclear"
 
 
 def test_fabricated_quote_dropped():
-    out = _out("Supported", [_LLMSource(url=DOCS[0]["url"], quote="30 hours per week")])
+    out = _out("Supported", [_LLMSource(url=DOCS[0]["url"], quote="30 hours per week", quote_translation="")])
     sources, verdict = validate_output(out, DOCS)
     assert sources == [] and verdict == "Unclear"
 
@@ -87,7 +89,7 @@ def test_missing_key_gives_friendly_error(monkeypatch):
 
 
 def test_rule_status_dropped_without_verified_citation(monkeypatch):
-    out = _out("Supported", [_LLMSource(url="https://example.com/fake", quote="x")])
+    out = _out("Supported", [_LLMSource(url="https://example.com/fake", quote="x", quote_translation="")])
     out.rule_status = "Blocked"
     monkeypatch.setattr(pipeline, "retrieve", lambda *a, **k: DOCS)
     monkeypatch.setattr(pipeline, "analyze", lambda *a, **k: out)
@@ -96,7 +98,7 @@ def test_rule_status_dropped_without_verified_citation(monkeypatch):
 
 
 def test_rule_status_kept_with_verified_citation(monkeypatch):
-    out = _out("Contradicted", [_LLMSource(url=DOCS[0]["url"], quote="up to 20 hours per week")])
+    out = _out("Contradicted", [_LLMSource(url=DOCS[0]["url"], quote="up to 20 hours per week", quote_translation="")])
     out.rule_status = "In effect"
     monkeypatch.setattr(pipeline, "retrieve", lambda *a, **k: DOCS)
     monkeypatch.setattr(pipeline, "analyze", lambda *a, **k: out)
@@ -166,7 +168,7 @@ def test_retrieve_skips_unreadable_pages_and_labels_scope(monkeypatch):
 
 
 def test_quote_must_come_from_fetched_text_not_model_memory():
-    out = _out("Supported", [_LLMSource(url=DOCS[0]["url"], quote="up to 20 hours per week")])
+    out = _out("Supported", [_LLMSource(url=DOCS[0]["url"], quote="up to 20 hours per week", quote_translation="")])
     sources, verdict = validate_output(out, [dict(DOCS[0], text="Totally different page text.")])
     assert sources == [] and verdict == "Unclear"
 
@@ -234,7 +236,7 @@ def test_unmatched_claim_falls_back_to_start_of_page_with_bigger_allowance():
 def test_quote_verified_against_full_text_not_the_trimmed_view():
     doc = dict(DOCS[0], text=LONG_PAGE, view="only a trimmed view")
     q = "not work more than 20 hours per week when school is in session"
-    out = _out("Contradicted", [_LLMSource(url=doc["url"], quote=q)])
+    out = _out("Contradicted", [_LLMSource(url=doc["url"], quote=q, quote_translation="")])
     sources, verdict = validate_output(out, [doc])
     assert len(sources) == 1 and verdict == "Contradicted"
 
@@ -289,3 +291,87 @@ def test_prompt_includes_todays_date():
 
     prompt = pipeline._build_user_prompt("c", {}, "School", [dict(DOCS[0], scope="federal")], "English")
     assert f"Today's date: {datetime.now(timezone.utc).date().isoformat()}" in prompt
+
+
+def test_analyze_uses_generate(monkeypatch):
+    seen = {}
+
+    def fake(system, prompt, schema, thinking=None, stats=None):
+        seen.update(system=system, prompt=prompt, schema=schema)
+        return _out("Unclear", []).model_dump_json()
+
+    monkeypatch.setenv("GEMINI_API_KEY", "x")
+    monkeypatch.setattr(pipeline, "_generate", fake, raising=False)
+    out = pipeline.analyze("claim", {}, "msu", DOCS, "English")
+    assert out.verdict == "Unclear"
+    assert seen["system"] == pipeline.SYSTEM_PROMPT and "claim" in seen["prompt"]
+
+
+def test_analyze_bad_json_is_friendly(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "x")
+    monkeypatch.setattr(pipeline, "_generate", lambda *a, **k: "not json", raising=False)
+    with pytest.raises(CheckError, match="reliable answer"):
+        pipeline.analyze("claim", {}, "msu", DOCS, "English")
+
+
+def test_generate_does_not_retry_inside_the_sdk(monkeypatch):
+    """A 429 must fail fast: the SDK's own retries honour Retry-After and can sleep for hours."""
+    import types
+
+    import google.genai as genai
+
+    seen = {}
+
+    class FakeClient:
+        def __init__(self, **kw):
+            seen.update(kw)
+            self.interactions = self
+
+        def create(self, **kw):
+            return types.SimpleNamespace(output_text="{}")
+
+    monkeypatch.setenv("GEMINI_API_KEY", "x")
+    monkeypatch.setattr(genai, "Client", FakeClient)
+    assert pipeline._generate("s", "p", {}) == "{}"
+    assert seen["http_options"]["retry_options"] == {"attempts": 1}
+    assert seen["http_options"]["timeout"] == pipeline.REQUEST_TIMEOUT_MS
+
+
+def test_rate_limit_error_is_a_friendly_message(monkeypatch):
+    import google.genai as genai
+
+    class Limited(Exception):
+        status_code = 429
+
+    class FakeClient:
+        def __init__(self, **kw):
+            self.interactions = self
+
+        def create(self, **kw):
+            raise Limited("Too Many Requests")
+
+    monkeypatch.setenv("GEMINI_API_KEY", "x")
+    monkeypatch.setattr(genai, "Client", FakeClient)
+    with pytest.raises(CheckError, match="usage limit"):
+        pipeline._generate("s", "p", {})
+
+
+@pytest.mark.parametrize("quote", ["on", "F-1", ".", "20 hours"])
+def test_trivial_quote_cannot_carry_a_verdict(quote):
+    """A quote of a word or two appears in any page, so it proves nothing."""
+    out = _out("Supported", [_LLMSource(url=DOCS[0]["url"], quote=quote, quote_translation="")])
+    sources, verdict = validate_output(out, DOCS)
+    assert sources == [] and verdict == "Unclear"
+
+
+def test_page_title_is_the_first_title_only():
+    """Pages repeat <title> inside inline icons; the source card must show it once."""
+    markup = ("<html><head><title>Employment | OISS</title></head><body><svg><title>icon</title></svg>"
+              "<p>Text.</p><title>Employment | OISS</title></body></html>")
+    title, text = pipeline.html_to_text(markup)
+    assert title == "Employment | OISS" and text == "Text."
+
+
+def test_a_stuck_model_call_gives_up_within_45_seconds():
+    """A student should not stare at a spinner for a minute before seeing an error."""
+    assert pipeline.REQUEST_TIMEOUT_MS <= 45_000
