@@ -46,18 +46,23 @@ def language_choices() -> dict[str, str]:
     return {code: lang["display"] for code, lang in load_languages().items()}
 
 
-def resolve_language(value: Optional[str]) -> str:
-    """Return a registry code for a code, display name, or model name.
+def resolve_language(value: Optional[str], strict: bool = False) -> str:
+    """Return a registry code for a code, display name, alias, or model name.
 
-    Unknown values fall back to English, so a stray label never breaks a check.
+    An empty value means "no choice made" and gives English. An unknown name gives
+    English too, unless strict=True, which raises ValueError so a caller can tell the
+    user instead of silently answering in the wrong language.
     """
     langs = load_languages()
-    if not value:
+    if not value or not value.strip():
         return DEFAULT_CODE
     v = value.strip().lower()
     for code, lang in langs.items():
-        if v in (code.lower(), lang["display"].lower(), lang["model_name"].lower()):
+        names = [code, lang["display"], lang["model_name"], *lang.get("aliases", [])]
+        if v in (str(n).lower() for n in names):
             return code
+    if strict:
+        raise ValueError(f"unsupported language: {value!r}")
     return DEFAULT_CODE
 
 

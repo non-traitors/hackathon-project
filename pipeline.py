@@ -560,7 +560,10 @@ def check_claim(claim: str, school_key: str, context: Optional[dict] = None, lan
     if school_key not in config["schools"]:
         raise CheckError("Please choose a supported school.")
 
-    code = langs.resolve_language(language)
+    try:
+        code = langs.resolve_language(language, strict=True)
+    except ValueError:
+        raise CheckError("Please choose a supported language.") from None
     school = config["schools"][school_key]
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
 

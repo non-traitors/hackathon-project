@@ -72,7 +72,7 @@ The verdict labels will stay in English across languages. The explanation will u
 | English | Clear explanations and consistent verdicts. |
 | Arabic — العربية | Translation accuracy and right-to-left layout. |
 | Mandarin Chinese (Simplified) — 中文 | Meaning, terminology, and readability. |
-| Cantonese (Traditional Chinese) — 粵語／繁體中文 | Review script and language separately; Traditional Chinese script alone does not establish Cantonese quality. |
+| Cantonese (Traditional Chinese) — 繁體中文 | Review script and language separately; Traditional Chinese script alone does not establish Cantonese quality. |
 | Russian — Русский | Translation accuracy and preservation of conditions and uncertainty. |
 
 The team will validate each option before presenting it as supported. Russian and Cantonese output may need additional review or a narrower initial scope.

@@ -8,6 +8,7 @@
 #
 # Fields
 #   display      name shown in the language picker
+#   aliases      other names accepted when a caller passes a language by name
 #   model_name   exact instruction given to Gemini for the answer language
 #   rtl          right-to-left script
 #   reviewed     see above
@@ -20,6 +21,7 @@
 languages:
   en:
     display: English
+    aliases: []
     model_name: English
     rtl: false
     reviewed: true
@@ -54,6 +56,7 @@ languages:
 
   ar:
     display: العربية
+    aliases: [Arabic]
     model_name: Arabic (Modern Standard Arabic)
     rtl: true
     reviewed: false
@@ -105,6 +108,7 @@ languages:
 
   zh:
     display: 中文
+    aliases: [Mandarin, 普通话, Simplified Chinese]
     model_name: Mandarin Chinese (Simplified characters)
     rtl: false
     reviewed: false
@@ -155,7 +159,8 @@ languages:
       tax: [税, 报税, irs]
 
   yue:
-    display: 粵語／繁體中文
+    display: 繁體中文
+    aliases: [粵語, 粵語／繁體中文, 廣東話, Cantonese, Traditional Chinese]
     model_name: "Cantonese as written in Hong Kong: Traditional Chinese characters in a plain written style that Cantonese speakers read easily"
     rtl: false
     reviewed: false
@@ -207,6 +212,7 @@ languages:
 
   ru:
     display: Русский
+    aliases: [Russian]
     model_name: Russian
     rtl: false
     reviewed: false

@@ -303,3 +303,28 @@ def test_starters_route_to_the_same_topics_as_their_english_original():
     for code in ("ar", "zh", "yue", "ru"):
         for i, claim in enumerate(langs.starters(code)):
             assert pipeline.matched_topics(claim), f"{code} starter {i} matches no topic: {claim}"
+
+
+def test_cantonese_is_shown_as_traditional_chinese_and_found_by_every_common_name():
+    assert langs.language_choices()["yue"] == "繁體中文"
+    for name in ("繁體中文", "粵語", "粵語／繁體中文", "廣東話", "Cantonese", "yue"):
+        assert langs.resolve_language(name, strict=True) == "yue", name
+    assert langs.resolve_language("中文", strict=True) == "zh"  # Simplified stays separate
+    assert langs.resolve_language("Русский", strict=True) == "ru"
+
+
+def test_unknown_language_is_an_error_not_silent_english(monkeypatch):
+    with pytest.raises(ValueError):
+        langs.resolve_language("Klingon", strict=True)
+    assert langs.resolve_language("Klingon") == "en"  # lenient mode, used only for display strings
+    assert langs.resolve_language("") == "en" and langs.resolve_language(None, strict=True) == "en"
+    monkeypatch.setattr(pipeline, "retrieve", lambda *a, **k: [dict(DOC)])
+    monkeypatch.setattr(pipeline, "analyze", lambda *a, **k: _out())
+    with pytest.raises(CheckError, match="supported language"):
+        check_claim("30 hours on campus", "msu", language="Klingon")
+
+
+def test_check_accepts_the_label_the_frontend_uses_for_cantonese(monkeypatch):
+    monkeypatch.setattr(pipeline, "retrieve", lambda *a, **k: [dict(DOC)])
+    monkeypatch.setattr(pipeline, "analyze", lambda *a, **k: _out())
+    assert check_claim("30 hours on campus", "msu", language="繁體中文").language == "yue"
